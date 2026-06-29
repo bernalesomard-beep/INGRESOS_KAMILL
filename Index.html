@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>IncomeControl - Resumen Anual</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-surface": "#181c20",
+          "inverse-primary": "#adc7ff",
+          "on-primary-container": "#ffffff",
+          "outline": "#727785",
+          "surface-dim": "#d7dae0",
+          "primary-fixed": "#d8e2ff",
+          "on-tertiary-fixed": "#261900",
+          "secondary": "#006d3a",
+          "inverse-surface": "#2d3135",
+          "background": "#f7f9ff",
+          "tertiary-fixed": "#ffdea3",
+          "surface-container-high": "#e5e8ee",
+          "on-secondary": "#ffffff",
+          "surface-container-low": "#f1f4fa",
+          "on-secondary-fixed-variant": "#00522b",
+          "on-tertiary": "#ffffff",
+          "error-container": "#ffdad6",
+          "surface-container-lowest": "#ffffff",
+          "on-tertiary-fixed-variant": "#5d4200",
+          "surface-variant": "#dfe3e8",
+          "tertiary-fixed-dim": "#fdbc13",
+          "secondary-container": "#7ff8a8",
+          "surface-container-highest": "#dfe3e8",
+          "secondary-fixed": "#82faab",
+          "error": "#ba1a1a",
+          "on-primary-fixed": "#001a41",
+          "surface-tint": "#005bc0",
+          "surface": "#f7f9ff",
+          "outline-variant": "#c1c6d6",
+          "on-tertiary-container": "#080400",
+          "tertiary-container": "#997000",
+          "on-error": "#ffffff",
+          "on-secondary-fixed": "#00210e",
+          "on-primary": "#ffffff",
+          "on-secondary-container": "#00723d",
+          "primary-container": "#1a73e8",
+          "primary": "#005bbf",
+          "tertiary": "#7a5800",
+          "on-error-container": "#93000a",
+          "on-background": "#181c20",
+          "primary-fixed-dim": "#adc7ff",
+          "secondary-fixed-dim": "#64dd91",
+          "inverse-on-surface": "#eef1f7",
+          "on-surface-variant": "#414754",
+          "surface-container": "#ebeef4",
+          "on-primary-fixed-variant": "#004493",
+          "surface-bright": "#f7f9ff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem","lg": "0.25rem","xl": "0.5rem","full": "0.75rem"
+        },
+        "spacing": {
+          "sm": "8px","grid-gutter": "16px","lg": "24px","md": "16px",
+          "xs": "4px","xl": "40px","base": "4px","grid-margin": "24px"
+        },
+        "fontFamily": {
+          "headline-sm": ["Inter"],"label-md": ["Inter"],"body-md": ["Inter"],
+          "headline-md-mobile": ["Inter"],"body-lg": ["Inter"],"headline-md": ["Inter"],
+          "mono-data": ["JetBrains Mono"],"body-sm": ["Inter"],"display-lg": ["Inter"]
+        },
+        "fontSize": {
+          "headline-sm": ["20px", {"lineHeight":"28px","fontWeight":"600"}],
+          "label-md": ["12px", {"lineHeight":"16px","letterSpacing":"0.05em","fontWeight":"600"}],
+          "body-md": ["14px", {"lineHeight":"20px","fontWeight":"400"}],
+          "headline-md-mobile": ["20px", {"lineHeight":"28px","fontWeight":"600"}],
+          "body-lg": ["16px", {"lineHeight":"24px","fontWeight":"400"}],
+          "headline-md": ["24px", {"lineHeight":"32px","letterSpacing":"-0.01em","fontWeight":"600"}],
+          "mono-data": ["13px", {"lineHeight":"16px","fontWeight":"500"}],
+          "body-sm": ["12px", {"lineHeight":"16px","fontWeight":"400"}],
+          "display-lg": ["36px", {"lineHeight":"44px","letterSpacing":"-0.02em","fontWeight":"700"}]
+        }
+      },
+    },
+  }
+</script>
+<style>
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    display: inline-block; vertical-align: middle; font-size: 18px;
+  }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .ghost-border { border: 1px solid #E0E3E7; }
+  @keyframes pulse-sync {
+    0% { transform: scale(0.95); opacity: 0.5; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.5; }
+  }
+  .sync-pulse { animation: pulse-sync 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .nav-item { display: flex; align-items: center; gap: 16px; padding: 8px 16px; border-radius: 0.25rem; cursor: pointer; transition: all 0.15s; }
+  .nav-item:hover { background-color: #e5e8ee; }
+  .nav-item.active { background-color: #7ff8a8; color: #00723d; font-weight: 600; }
+  .section-content { display: none; }
+  .section-content.active { display: block; }
+  /* Registro form styles */
+  .form-label { font-size: 10px; font-weight: 700; color: #414754; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: block; }
+  .form-input { width: 100%; background: #f7f9ff; border: 1px solid #c1c6d6; border-radius: 0.25rem; font-size: 14px; padding: 6px 10px; }
+  .form-input:focus { outline: none; ring: 2px solid #005bbf; border-color: #005bbf; }
+  .skeleton { background: linear-gradient(90deg, #e5e8ee 25%, #f1f4fa 50%, #e5e8ee 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+</style>
+</head>
+<body class="bg-surface font-body-md text-on-surface">
+
+<!-- SideNavBar -->
+<aside class="h-full w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col h-screen py-lg px-md z-50">
+  <div class="mb-xl flex items-center gap-md">
+    <div>
+      <h1 class="font-headline-md text-headline-md font-bold text-on-surface">Control de ingreso</h1>
+      <p class="text-body-sm text-on-surface-variant leading-none">CLIENTE - 271</p>
+    </div>
+  </div>
+  <nav class="flex-1 space-y-xs">
+    <div class="nav-item active" onclick="showSection('panel')">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">dashboard</span>
+      <span class="font-label-md text-label-md">Panel</span>
+    </div>
+    <div class="nav-item" onclick="showSection('registro')">
+      <span class="material-symbols-outlined">edit_square</span>
+      <span class="font-label-md text-label-md">Registro</span>
+    </div>
+    <div class="nav-item" onclick="showSection('detalle')">
+      <span class="material-symbols-outlined">list_alt</span>
+      <span class="font-label-md text-label-md">Detalle</span>
+    </div>
+  </nav>
+  <div class="mt-auto pt-lg">
+    <div class="mt-lg flex items-center gap-md p-sm bg-surface-container-lowest rounded-xl ghost-border">
+      <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">OB</div>
+      <div class="overflow-hidden">
+        <p class="font-label-md text-label-md truncate">Omar Bernales</p>
+        <p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Odan89</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant ml-auto">more_vert</span>
+    </div>
+  </div>
+</aside>
+
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-64 h-16 bg-surface border-b border-outline-variant z-40">
+  <div class="flex justify-between items-center px-grid-margin w-full h-full">
+    <div class="flex items-center gap-xl">
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
+        <input id="searchInput" class="pl-10 pr-md py-xs bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary w-64 text-body-md" placeholder="Buscar datos..." type="text" oninput="onSearch()"/>
+      </div>
+    </div>
+    <div class="flex items-center gap-lg">
+      <div class="flex items-center gap-sm px-md py-1 bg-secondary-container/30 rounded-full border border-secondary/20">
+        <div class="w-2 h-2 rounded-full bg-secondary sync-pulse"></div>
+        <span id="syncStatus" class="text-[11px] font-semibold text-on-secondary-container">Cargando...</span>
+      </div>
+      <div class="flex items-center gap-md">
+        <button class="p-base hover:bg-surface-container-high rounded-full transition-colors relative">
+          <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+          <div class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full border-2 border-surface"></div>
+        </button>
+        <button class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+          <span class="material-symbols-outlined text-on-surface-variant">help_outline</span>
+        </button>
+      </div>
+      <div class="h-8 w-px bg-outline-variant"></div>
+      <button onclick="showSection('registro')" class="px-lg py-sm bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary-container active:scale-95 transition-all text-body-md">
+        Agregar Ingreso
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="ml-64 pt-16 min-h-screen">
+<div class="max-w-[1440px] mx-auto p-grid-margin">
+
+  <!-- ===== PANEL SECTION ===== -->
+  <div id="section-panel" class="section-content active">
+    <section class="mb-xl">
+      <div class="flex justify-between items-end mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Panel de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Datos sincronizados desde Google Sheets</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">refresh</span> Actualizar
+          </button>
+          <button onclick="exportPanel()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">download</span> Exportar
+          </button>
+        </div>
+      </div>
+
+      <!-- Monthly KPI Cards -->
+      <div id="kpiGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-grid-gutter">
+        <!-- Skeletons while loading -->
+        <script>for(let i=0;i<12;i++) document.write('<div class="bg-surface-container-lowest p-md rounded-xl ghost-border"><div class="skeleton h-4 w-16 mb-sm"></div><div class="skeleton h-6 w-12 mb-xs"></div><div class="skeleton h-6 w-14"></div></div>');</script>
+      </div>
+    </section>
+
+    <!-- Charts + Table -->
+    <div class="grid grid-cols-12 gap-grid-gutter">
+      <!-- Income Trend Chart -->
+      <section class="col-span-12 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+        <div class="flex justify-between items-center mb-xl">
+          <div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface">Tendencias de Ingresos (Anual)</h4>
+            <p class="text-body-sm text-on-surface-variant">Visualización de proveedores y unidades ingresadas por mes</p>
+          </div>
+          <div class="flex items-center gap-lg">
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full bg-[#005bbf]"></div>
+              <span class="text-body-sm font-semibold">Unidades</span>
+            </div>
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full border-2 border-[#006d3a] bg-white"></div>
+              <span class="text-body-sm font-semibold">Proveedores</span>
+            </div>
+          </div>
+        </div>
+        <div class="h-80 w-full mb-md px-md">
+          <canvas id="incomeTrendChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Top Materiales Chart -->
+      <section class="col-span-12 lg:col-span-6 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+        <h4 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Top Materiales por Cantidad</h4>
+        <p class="text-body-sm text-on-surface-variant mb-lg">Materiales con mayor volumen de ingreso</p>
+        <div class="h-64">
+          <canvas id="topMaterialesChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Ingresos por Mes (Barras) -->
+      <section class="col-span-12 lg:col-span-6 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+        <h4 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Unidades por Mes</h4>
+        <p class="text-body-sm text-on-surface-variant mb-lg">Total de unidades ingresadas cada mes</p>
+        <div class="h-64">
+          <canvas id="unidadesBarChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Recent Detalle Table in Panel -->
+      <section class="col-span-12 bg-surface-container-lowest rounded-xl ghost-border overflow-hidden">
+        <div class="px-lg py-md border-b border-outline-variant flex justify-between items-center">
+          <div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface">Últimos Ingresos</h4>
+            <p class="text-body-sm text-on-surface-variant">Registros recientes del detalle de ingresos</p>
+          </div>
+          <button onclick="showSection('detalle')" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            Ver todo <span class="material-symbols-outlined">arrow_forward</span>
+          </button>
+        </div>
+        <div class="overflow-auto max-h-[300px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
+              </tr>
+            </thead>
+            <tbody id="panelRecentTable" class="divide-y divide-outline-variant">
+              <tr><td colspan="7" class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===== REGISTRO SECTION ===== -->
+  <div id="section-registro" class="section-content">
+    <section class="mb-xl">
+      <div class="flex justify-between items-end mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Registro de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Datos de la hoja de Registro</p>
+        </div>
+        <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+          <span class="material-symbols-outlined">refresh</span> Actualizar
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-surface-container-lowest rounded-xl ghost-border overflow-hidden mb-grid-gutter">
+        <div class="px-lg py-md bg-surface-container-low/50 border-b border-outline-variant flex flex-wrap gap-md">
+          <div class="flex-1 min-w-[150px]">
+            <label class="form-label">Buscar</label>
+            <input id="registroSearch" oninput="filterRegistro()" class="form-input" placeholder="Buscar en registros..." type="text"/>
+          </div>
+          <div class="flex-1 min-w-[150px]">
+            <label class="form-label">Mes</label>
+            <select id="registroMesFilter" onchange="filterRegistro()" class="form-input">
+              <option value="">Todos</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-auto max-h-[600px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead id="registroHead" class="bg-surface-container-low sticky top-0 z-10">
+              <tr><th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
+            </thead>
+            <tbody id="registroBody" class="divide-y divide-outline-variant">
+              <tr><td class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-md border-t border-outline-variant flex justify-between items-center">
+          <span id="registroCount" class="text-body-sm text-on-surface-variant">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== DETALLE SECTION ===== -->
+  <div id="section-detalle" class="section-content">
+    <section class="mb-xl">
+      <div class="flex justify-between items-end mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Detalle de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Datos de la hoja de Detalle</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">refresh</span> Actualizar
+          </button>
+          <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">download</span> Exportar
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded-xl ghost-border overflow-hidden">
+        <!-- Filters -->
+        <div class="px-lg py-md bg-surface-container-low/50 border-b border-outline-variant flex flex-wrap gap-md">
+          <div class="flex-1 min-w-[150px]">
+            <label class="form-label">Mes</label>
+            <select id="detalleMesFilter" onchange="filterDetalle()" class="form-input">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="flex-1 min-w-[150px]">
+            <label class="form-label">Documento</label>
+            <input id="detalleDocFilter" oninput="filterDetalle()" class="form-input" placeholder="Buscar FAC..." type="text"/>
+          </div>
+          <div class="flex-1 min-w-[150px]">
+            <label class="form-label">Material</label>
+            <input id="detalleMtFilter" oninput="filterDetalle()" class="form-input" placeholder="Buscar MT..." type="text"/>
+          </div>
+        </div>
+        <div class="overflow-auto max-h-[600px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EAN</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LOTE</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EXPIRA</th>
+                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
+              </tr>
+            </thead>
+            <tbody id="detalleBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="10" class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-md border-t border-outline-variant flex justify-between items-center">
+          <span id="detalleCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="detalleTotal" class="text-body-sm font-semibold text-on-surface">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</main>
+
+<script>
+// ========== CONFIG ==========
+const CSV_REGISTRO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
+const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
+
+// Use a CORS proxy to avoid cross-origin issues when opening as a local file
+function proxyUrl(url) {
+  // Try direct first; if CORS fails (local file), use allorigins proxy
+  return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+}
+
+// ========== STATE ==========
+let registroData = [];
+let detalleData = [];
+let registroFiltered = [];
+let detalleFiltered = [];
+let chartLine = null;
+let chartBar = null;
+let chartMateriales = null;
+
+// ========== NAV ==========
+function showSection(name) {
+  document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(name)) n.classList.add('active');
+  });
+}
+
+// ========== SEARCH (global, panel only) ==========
+function onSearch() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  if (q.length > 0) {
+    showSection('detalle');
+    document.getElementById('detalleDocFilter').value = q;
+    filterDetalle();
+  }
+}
+
+// ========== LOAD DATA ==========
+async function fetchCSV(url) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(proxyUrl(url), {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: r => resolve(r.data),
+      error: e => reject(e)
+    });
+  });
+}
+
+async function loadAllData() {
+  document.getElementById('syncStatus').textContent = 'Sincronizando...';
+  try {
+    const [reg, det] = await Promise.all([fetchCSV(CSV_REGISTRO), fetchCSV(CSV_DETALLE)]);
+    registroData = reg;
+    detalleData = det;
+    registroFiltered = [...reg];
+    detalleFiltered = [...det];
+
+    const now = new Date();
+    document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit'});
+
+    renderRegistro();
+    renderDetalle();
+    renderPanel();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('syncStatus').textContent = 'Error de sincronización';
+    // Try direct URL as fallback
+    loadDirect();
+  }
+}
+
+async function loadDirect() {
+  // Fallback: direct fetch (works if running from a server)
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(CSV_REGISTRO).then(r => r.text()),
+      fetch(CSV_DETALLE).then(r => r.text())
+    ]);
+    registroData = Papa.parse(r1, {header:true, skipEmptyLines:true}).data;
+    detalleData  = Papa.parse(r2, {header:true, skipEmptyLines:true}).data;
+    registroFiltered = [...registroData];
+    detalleFiltered  = [...detalleData];
+
+    const now = new Date();
+    document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+    renderRegistro();
+    renderDetalle();
+    renderPanel();
+  } catch(e) {
+    document.getElementById('syncStatus').textContent = 'Sin conexión';
+    document.getElementById('panelRecentTable').innerHTML = '<tr><td colspan="7" class="px-lg py-lg text-center text-error">No se pudo conectar a Google Sheets. Verifica tu conexión.</td></tr>';
+  }
+}
+
+// ========== HELPERS ==========
+function getCol(row, candidates) {
+  for (const k of Object.keys(row)) {
+    const kl = k.toLowerCase().trim();
+    for (const c of candidates) {
+      if (kl.includes(c)) return row[k];
+    }
+  }
+  return '';
+}
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MESES_SHORT = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
+function getMesIndex(mesStr) {
+  if (!mesStr) return -1;
+  const m = mesStr.toLowerCase().trim();
+  return MESES_ES.findIndex(me => me.startsWith(m.substring(0,3)));
+}
+
+function getCantidad(row) {
+  const v = getCol(row, ['cantidad','qty','units','unidades']);
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g,''));
+  return isNaN(n) ? 0 : n;
+}
+
+// ========== RENDER REGISTRO ==========
+function renderRegistro() {
+  if (!registroData.length) return;
+  const keys = Object.keys(registroData[0]);
+
+  // Build header
+  document.getElementById('registroHead').innerHTML = '<tr>' +
+    keys.map(k => `<th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${k.toUpperCase()}</th>`).join('') + '</tr>';
+
+  // Populate mes filter
+  const meses = [...new Set(registroData.map(r => getCol(r, ['mes','month'])).filter(Boolean))];
+  const selReg = document.getElementById('registroMesFilter');
+  selReg.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+
+  filterRegistro();
+}
+
+function filterRegistro() {
+  const q = document.getElementById('registroSearch').value.toLowerCase();
+  const mes = document.getElementById('registroMesFilter').value.toLowerCase();
+  registroFiltered = registroData.filter(r => {
+    const rowMes = getCol(r, ['mes','month']).toLowerCase();
+    if (mes && !rowMes.includes(mes)) return false;
+    if (q) {
+      const vals = Object.values(r).join(' ').toLowerCase();
+      if (!vals.includes(q)) return false;
+    }
+    return true;
+  });
+  const keys = registroData.length ? Object.keys(registroData[0]) : [];
+  const tbody = document.getElementById('registroBody');
+  if (!registroFiltered.length) {
+    tbody.innerHTML = '<tr><td colspan="' + keys.length + '" class="px-lg py-lg text-center text-on-surface-variant">Sin resultados</td></tr>';
+  } else {
+    tbody.innerHTML = registroFiltered.map(r =>
+      '<tr class="hover:bg-surface-container-high transition-colors">' +
+      keys.map(k => `<td class="px-lg py-lg text-on-surface-variant font-mono-data">${r[k] || ''}</td>`).join('') +
+      '</tr>'
+    ).join('');
+  }
+  document.getElementById('registroCount').textContent = registroFiltered.length + ' registros';
+}
+
+// ========== RENDER DETALLE ==========
+function renderDetalle() {
+  if (!detalleData.length) return;
+
+  // Populate mes filter
+  const meses = [...new Set(detalleData.map(r => getCol(r, ['mes','month'])).filter(Boolean))];
+  const selDet = document.getElementById('detalleMesFilter');
+  selDet.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+
+  filterDetalle();
+}
+
+function filterDetalle() {
+  const mes = document.getElementById('detalleMesFilter').value.toLowerCase();
+  const doc = document.getElementById('detalleDocFilter').value.toLowerCase();
+  const mt  = document.getElementById('detalleMtFilter').value.toLowerCase();
+
+  detalleFiltered = detalleData.filter(r => {
+    const rowMes  = getCol(r, ['mes','month']).toLowerCase();
+    const rowDoc  = getCol(r, ['documento','doc','factura','fac']).toLowerCase();
+    const rowMat  = getCol(r, ['material','mat','codigo']).toLowerCase();
+    if (mes && !rowMes.includes(mes)) return false;
+    if (doc && !rowDoc.includes(doc)) return false;
+    if (mt  && !rowMat.includes(mt))  return false;
+    return true;
+  });
+
+  renderDetalleTable(detalleFiltered);
+}
+
+function renderDetalleTable(rows) {
+  const tbody = document.getElementById('detalleBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="px-lg py-lg text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('detalleCount').textContent = '0 registros';
+    document.getElementById('detalleTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const mes  = getCol(r, ['mes','month']);
+    const fec  = getCol(r, ['fecha','date']);
+    const oc   = getCol(r, ['oc','orden']);
+    const doc  = getCol(r, ['documento','doc','factura','fac']);
+    const mat  = getCol(r, ['material','mat','codigo']);
+    const desc = getCol(r, ['descripcion','description','desc']);
+    const ean  = getCol(r, ['ean','codigo barra','barcode']);
+    const lote = getCol(r, ['lote','lot','batch']);
+    const exp  = getCol(r, ['expir','venc','fecha venc']);
+    const qty  = getCol(r, ['cantidad','qty','units','unidades']);
+    return `<tr class="hover:bg-surface-container-high transition-colors">
+      <td class="px-lg py-lg text-on-surface-variant font-label-md">${mes}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
+      <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
+      <td class="px-lg py-lg font-semibold text-body-md">${mat}</td>
+      <td class="px-lg py-lg text-on-surface-variant truncate max-w-[150px]">${desc}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${ean}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${lote}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${exp}</td>
+      <td class="px-lg py-lg text-right font-mono-data font-bold text-on-surface">${qty}</td>
+    </tr>`;
+  }).join('');
+
+  const total = rows.reduce((s, r) => s + getCantidad(r), 0);
+  document.getElementById('detalleCount').textContent = rows.length + ' registros';
+  document.getElementById('detalleTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
+}
+
+// ========== RENDER PANEL (charts based on DETALLE) ==========
+function renderPanel() {
+  // --- Monthly KPI from DETALLE ---
+  const byMes = {};
+  MESES_ES.forEach((m, i) => { byMes[i] = { providers: new Set(), units: 0 }; });
+
+  detalleData.forEach(r => {
+    const mes = getCol(r, ['mes','month']);
+    const idx = getMesIndex(mes);
+    if (idx < 0) return;
+    const prv = getCol(r, ['proveedor','provider','supplier','oc','orden']);
+    if (prv) byMes[idx].providers.add(prv);
+    byMes[idx].units += getCantidad(r);
+  });
+
+  // KPI Cards
+  const kpiGrid = document.getElementById('kpiGrid');
+  kpiGrid.innerHTML = MESES_ES.map((m, i) => {
+    const d = byMes[i];
+    const hasData = d.units > 0 || d.providers.size > 0;
+    return `<div class="bg-surface-container-lowest p-md rounded-xl ghost-border hover:shadow-md transition-all">
+      <p class="font-label-md text-label-md text-primary uppercase font-bold mb-xs">${m}</p>
+      <div class="space-y-base">
+        <div class="flex items-center gap-xs">
+          <span class="material-symbols-outlined text-on-surface-variant" title="Proveedores">group</span>
+          <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.providers.size : '—'}</p>
+        </div>
+        <div class="flex items-center gap-xs">
+          <span class="material-symbols-outlined text-on-surface-variant" title="Unidades">inventory_2</span>
+          <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.units.toLocaleString('es-PE') : '—'}</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // --- Line chart: Unidades + Proveedores por mes ---
+  const unitsData = MESES_ES.map((_, i) => byMes[i].units);
+  const provData  = MESES_ES.map((_, i) => byMes[i].providers.size);
+
+  const ctx = document.getElementById('incomeTrendChart').getContext('2d');
+  if (chartLine) chartLine.destroy();
+  const gradientUnits = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientUnits.addColorStop(0, 'rgba(0, 91, 191, 0.2)');
+  gradientUnits.addColorStop(1, 'rgba(0, 91, 191, 0)');
+  chartLine = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MESES_SHORT,
+      datasets: [
+        {
+          label: 'Unidades', data: unitsData,
+          borderColor: '#005bbf', backgroundColor: gradientUnits,
+          fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#ffffff', pointBorderColor: '#005bbf', pointBorderWidth: 2, yAxisID: 'y'
+        },
+        {
+          label: 'Proveedores', data: provData,
+          borderColor: '#006d3a', borderDash: [5,5],
+          fill: false, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#ffffff', pointBorderColor: '#006d3a', pointBorderWidth: 2, yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          backgroundColor: '#181c20',
+          titleFont: {family:'Inter',weight:'600'}, bodyFont: {family:'Inter'}, padding: 12,
+          callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + ctx.parsed.y.toLocaleString('es-PE') }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true, position: 'left',
+          grid: { color: '#ebeef4', drawBorder: false },
+          ticks: { color:'#727785', font:{family:'JetBrains Mono',size:10}, callback: v => v>=1000?(v/1000)+'k':v }
+        },
+        y1: {
+          beginAtZero: true, position: 'right',
+          grid: { display: false },
+          ticks: { color:'#006d3a', font:{family:'JetBrains Mono',size:10} }
+        },
+        x: { grid:{display:false}, ticks:{color:'#727785',font:{family:'Inter',weight:'600',size:10}} }
+      },
+      interaction: { intersect: false, mode: 'nearest' }
+    }
+  });
+
+  // --- Bar chart: Unidades por mes ---
+  const ctx2 = document.getElementById('unidadesBarChart').getContext('2d');
+  if (chartBar) chartBar.destroy();
+  chartBar = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: MESES_SHORT,
+      datasets: [{ label: 'Unidades', data: unitsData, backgroundColor: '#005bbf', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE') } } },
+      scales: {
+        y: { beginAtZero: true, grid:{color:'#ebeef4'}, ticks:{color:'#727785',font:{size:10},callback:v=>v>=1000?(v/1000)+'k':v} },
+        x: { grid:{display:false}, ticks:{color:'#727785',font:{size:10}} }
+      }
+    }
+  });
+
+  // --- Top Materiales bar chart ---
+  const matMap = {};
+  detalleData.forEach(r => {
+    const mat  = getCol(r, ['material','mat','codigo']) || 'Sin código';
+    const desc = getCol(r, ['descripcion','description','desc']) || mat;
+    const key  = mat;
+    if (!matMap[key]) matMap[key] = { label: mat + ' - ' + desc.substring(0,20), qty: 0 };
+    matMap[key].qty += getCantidad(r);
+  });
+  const sorted = Object.values(matMap).sort((a,b) => b.qty - a.qty).slice(0,10);
+
+  const ctx3 = document.getElementById('topMaterialesChart').getContext('2d');
+  if (chartMateriales) chartMateriales.destroy();
+  chartMateriales = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(m => m.label),
+      datasets: [{ label: 'Cantidad', data: sorted.map(m => m.qty), backgroundColor: '#006d3a', borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false} },
+      scales: {
+        x: { beginAtZero:true, grid:{color:'#ebeef4'}, ticks:{color:'#727785',font:{size:10}} },
+        y: { grid:{display:false}, ticks:{color:'#414754',font:{size:11}} }
+      }
+    }
+  });
+
+  // --- Recent table in panel (last 10 rows of detalle) ---
+  const recent = [...detalleData].reverse().slice(0, 10);
+  document.getElementById('panelRecentTable').innerHTML = recent.length ?
+    recent.map(r => {
+      const mes  = getCol(r, ['mes','month']);
+      const fec  = getCol(r, ['fecha','date']);
+      const oc   = getCol(r, ['oc','orden']);
+      const doc  = getCol(r, ['documento','doc','factura','fac']);
+      const mat  = getCol(r, ['material','mat','codigo']);
+      const desc = getCol(r, ['descripcion','description','desc']);
+      const qty  = getCol(r, ['cantidad','qty','units','unidades']);
+      return `<tr class="hover:bg-surface-container-high transition-colors">
+        <td class="px-lg py-lg text-on-surface-variant font-label-md">${mes}</td>
+        <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
+        <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
+        <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
+        <td class="px-lg py-lg font-semibold text-body-md">${mat}</td>
+        <td class="px-lg py-lg text-on-surface-variant truncate max-w-[150px]">${desc}</td>
+        <td class="px-lg py-lg text-right font-mono-data font-bold text-on-surface">${qty}</td>
+      </tr>`;
+    }).join('')
+    : '<tr><td colspan="7" class="px-lg py-lg text-center text-on-surface-variant">Sin datos</td></tr>';
+}
+
+// ========== EXPORT ==========
+function exportDetalle() {
+  const csv = Papa.unparse(detalleFiltered);
+  download('detalle_ingresos.csv', csv, 'text/csv');
+}
+function exportPanel() {
+  const csv = Papa.unparse(detalleData);
+  download('panel_ingresos.csv', csv, 'text/csv');
+}
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name; a.click();
+}
+
+// ========== GHOST BORDER HOVER ==========
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ghost-border').forEach(card => {
+    card.addEventListener('mouseenter', () => { card.style.transform = 'translateY(-2px)'; });
+    card.addEventListener('mouseleave', () => { card.style.transform = 'translateY(0)'; });
+  });
+  loadAllData();
+});
+</script>
+</body>
+</html>
