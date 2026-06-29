@@ -281,7 +281,6 @@
               <tr>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
@@ -290,7 +289,7 @@
               </tr>
             </thead>
             <tbody id="panelRecentTable" class="divide-y divide-outline-variant">
-              <tr><td colspan="8" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -306,42 +305,80 @@
   <!-- ===== REGISTRO SECTION ===== -->
   <div id="section-registro" class="section-content">
     <section class="mb-xl">
-      <div class="flex justify-between items-end mb-lg">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
         <div>
           <h2 class="font-display-lg text-display-lg text-on-surface">Registro de Ingresos</h2>
-          <p class="text-body-sm text-on-surface-variant mt-xs">Datos de la hoja de Registro</p>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Vista completa de la hoja de Registro</p>
         </div>
-        <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
-          <span class="material-symbols-outlined">refresh</span> Actualizar
-        </button>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportRegistro()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
+          </button>
+        </div>
       </div>
 
-      <!-- Filters -->
-      <div class="bg-surface-container-lowest rounded-xl ghost-border overflow-hidden mb-grid-gutter">
-        <div class="px-lg py-md bg-surface-container-low/50 border-b border-outline-variant flex flex-wrap gap-md">
-          <div class="flex-1 min-w-[150px]">
-            <label class="form-label">Buscar</label>
-            <input id="registroSearch" oninput="filterRegistro()" class="form-input" placeholder="Buscar en registros..." type="text"/>
-          </div>
-          <div class="flex-1 min-w-[150px]">
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearRegistroFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
             <label class="form-label">Mes</label>
             <select id="registroMesFilter" onchange="filterRegistro()" class="form-input">
-              <option value="">Todos</option>
+              <option value="">Todos los meses</option>
             </select>
           </div>
+          <div>
+            <label class="form-label">Tipo</label>
+            <input id="registroTipoFilter" oninput="filterRegistro()" class="form-input" placeholder="Buscar tipo..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Documento</label>
+            <input id="registroDocFilter" oninput="filterRegistro()" class="form-input" placeholder="Buscar documento..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Búsqueda general</label>
+            <input id="registroSearch" oninput="filterRegistro()" class="form-input" placeholder="Buscar en todo..." type="text"/>
+          </div>
         </div>
-        <div class="overflow-auto max-h-[600px] hide-scrollbar">
+        <div id="registroFilterChips" class="hidden px-lg pb-md flex flex-wrap gap-xs"></div>
+      </div>
+
+      <!-- Bulk action bar -->
+      <div id="registroBulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="registroBulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportRegistroSelected()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar selección
+          </button>
+          <button onclick="clearRegistroSelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
           <table class="w-full text-left border-collapse">
             <thead id="registroHead" class="bg-surface-container-low sticky top-0 z-10">
-              <tr><th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
+              <tr><th class="px-md py-md font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
             </thead>
             <tbody id="registroBody" class="divide-y divide-outline-variant">
-              <tr><td class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td class="px-md py-sm text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="px-lg py-md border-t border-outline-variant flex justify-between items-center">
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
           <span id="registroCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="registroTotal" class="text-body-sm font-bold text-primary">—</span>
         </div>
       </div>
     </section>
@@ -361,7 +398,7 @@
             <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
           </button>
           <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar CSV
           </button>
         </div>
       </div>
@@ -422,7 +459,6 @@
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('mes')">MES <span class="material-symbols-outlined text-[12px]" id="sort-mes">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('fecha')">FECHA <span class="material-symbols-outlined text-[12px]" id="sort-fecha">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('oc')">OC <span class="material-symbols-outlined text-[12px]" id="sort-oc">unfold_more</span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
@@ -433,7 +469,7 @@
               </tr>
             </thead>
             <tbody id="detalleBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -525,7 +561,7 @@ async function loadAllData() {
     console.error(e);
     document.getElementById('syncStatus').textContent = 'Error al cargar datos';
     document.getElementById('panelRecentTable').innerHTML =
-      '<tr><td colspan="8" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
+      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
   }
 }
 
@@ -591,55 +627,204 @@ function getMesIndex(mesStr) {
 }
 
 // ========== RENDER REGISTRO ==========
+const selectedRegistroRows = new Set();
+let registroSortCol = null, registroSortDir = 1;
+let registroKeys = [];
+
 function renderRegistro() {
   if (!registroData.length) return;
-  const keys = Object.keys(registroData[0]);
+  registroKeys = Object.keys(registroData[0]);
 
-  // Build header
-  document.getElementById('registroHead').innerHTML = '<tr>' +
-    keys.map(k => `<th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${k.toUpperCase()}</th>`).join('') + '</tr>';
-
-  // Populate mes filter — busca columna que contenga 'mes' o 'month' en el sheet de registro
-  const mesKey = keys.find(k => k.toLowerCase().includes('mes') || k.toLowerCase().includes('month')) || '';
+  // Mes filter — busca columna MES
+  const mesKey = registroKeys.find(k => k.trim().toUpperCase() === 'MES') ||
+                 registroKeys.find(k => k.toLowerCase().includes('mes')) || '';
   const meses = mesKey
-    ? [...new Set(registroData.map(r => (r[mesKey] || '').trim()).filter(Boolean))]
+    ? MESES_ES.filter(m => registroData.some(r => (r[mesKey]||'').toLowerCase().includes(m.substring(0,3))))
     : [];
   const selReg = document.getElementById('registroMesFilter');
-  selReg.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+  selReg.innerHTML = '<option value="">Todos los meses</option>' +
+    meses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('');
   selReg.dataset.mesKey = mesKey;
+
+  // Build sortable header with checkbox
+  const sortableKeys = ['MES','TIPO','ORD','REFERENTE','INGRESO','DOCUMENTO','MATERIAL NUMBER','CANTIDAD','CANT.'];
+  document.getElementById('registroHead').innerHTML = '<tr>' +
+    `<th class="px-md py-md w-10"><input id="regCheckAll" type="checkbox" onchange="toggleAllRegistroRows(this)" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"/></th>` +
+    registroKeys.map(k => {
+      const sortable = sortableKeys.some(s => k.toUpperCase().includes(s));
+      return `<th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap ${sortable?'cursor-pointer hover:text-primary select-none':''}" ${sortable?`onclick="sortRegistro('${k}')"`:''}>${k.toUpperCase()}${sortable?` <span class="material-symbols-outlined text-[12px]" id="regsort-${k.replace(/[^a-z0-9]/gi,'_')}">unfold_more</span>`:''}</th>`;
+    }).join('') + '</tr>';
 
   filterRegistro();
 }
 
+function clearRegistroFilters() {
+  ['registroMesFilter','registroTipoFilter','registroDocFilter','registroSearch'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterRegistro();
+}
+
 function filterRegistro() {
-  const q = document.getElementById('registroSearch').value.toLowerCase();
-  const mes = document.getElementById('registroMesFilter').value.toLowerCase();
   const mesKey = document.getElementById('registroMesFilter').dataset.mesKey || '';
+  const mes  = document.getElementById('registroMesFilter').value.toLowerCase();
+  const tipo = (document.getElementById('registroTipoFilter')?.value || '').toLowerCase();
+  const doc  = (document.getElementById('registroDocFilter')?.value  || '').toLowerCase();
+  const q    = document.getElementById('registroSearch').value.toLowerCase();
 
   registroFiltered = registroData.filter(r => {
     if (mes && mesKey) {
-      const rowMes = (r[mesKey] || '').toLowerCase();
-      if (!rowMes.includes(mes)) return false;
+      if (!(r[mesKey]||'').toLowerCase().includes(mes.substring(0,3))) return false;
+    }
+    if (tipo) {
+      const tipoKey = registroKeys.find(k => k.toLowerCase().includes('tipo')) || '';
+      if (tipoKey && !(r[tipoKey]||'').toLowerCase().includes(tipo)) return false;
+    }
+    if (doc) {
+      const docKey = registroKeys.find(k => k.toLowerCase().includes('documento') || k.toLowerCase().includes('doc')) || '';
+      if (docKey && !(r[docKey]||'').toLowerCase().includes(doc)) return false;
     }
     if (q) {
-      const vals = Object.values(r).join(' ').toLowerCase();
-      if (!vals.includes(q)) return false;
+      if (!Object.values(r).join(' ').toLowerCase().includes(q)) return false;
     }
     return true;
   });
 
-  const keys = registroData.length ? Object.keys(registroData[0]) : [];
-  const tbody = document.getElementById('registroBody');
-  if (!registroFiltered.length) {
-    tbody.innerHTML = '<tr><td colspan="' + keys.length + '" class="px-lg py-lg text-center text-on-surface-variant">Sin resultados</td></tr>';
-  } else {
-    tbody.innerHTML = registroFiltered.map(r =>
-      '<tr class="hover:bg-surface-container-high transition-colors">' +
-      keys.map(k => `<td class="px-lg py-lg text-on-surface-variant font-mono-data">${r[k] || ''}</td>`).join('') +
-      '</tr>'
+  // Update chips
+  const chips = document.getElementById('registroFilterChips');
+  const active = [
+    mes  ? `Mes: ${mes}`  : null,
+    tipo ? `Tipo: ${tipo}` : null,
+    doc  ? `Doc: ${doc}`   : null,
+    q    ? `Búsqueda: ${q}` : null,
+  ].filter(Boolean);
+  if (active.length) {
+    chips.classList.remove('hidden');
+    chips.innerHTML = active.map(t =>
+      `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">${t}</span>`
     ).join('');
+  } else {
+    chips.classList.add('hidden'); chips.innerHTML = '';
   }
-  document.getElementById('registroCount').textContent = registroFiltered.length + ' registros';
+
+  selectedRegistroRows.clear();
+  updateRegistroBulkBar();
+  renderRegistroTable(registroFiltered);
+}
+
+function sortRegistro(col) {
+  if (registroSortCol === col) registroSortDir *= -1;
+  else { registroSortCol = col; registroSortDir = 1; }
+  document.querySelectorAll('[id^="regsort-"]').forEach(el => el.textContent = 'unfold_more');
+  const id = 'regsort-' + col.replace(/[^a-z0-9]/gi,'_');
+  const el = document.getElementById(id);
+  if (el) el.textContent = registroSortDir === 1 ? 'arrow_upward' : 'arrow_downward';
+
+  registroFiltered.sort((a, b) => {
+    const va = (a[col]||'').toString();
+    const vb = (b[col]||'').toString();
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) return (na - nb) * registroSortDir;
+    return va.localeCompare(vb) * registroSortDir;
+  });
+  selectedRegistroRows.clear(); updateRegistroBulkBar();
+  renderRegistroTable(registroFiltered);
+}
+
+function toggleRegistroRow(idx, cb) {
+  if (cb.checked) selectedRegistroRows.add(idx); else selectedRegistroRows.delete(idx);
+  const ca = document.getElementById('regCheckAll');
+  ca.indeterminate = selectedRegistroRows.size > 0 && selectedRegistroRows.size < registroFiltered.length;
+  ca.checked = selectedRegistroRows.size === registroFiltered.length && registroFiltered.length > 0;
+  updateRegistroBulkBar();
+}
+
+function toggleAllRegistroRows(masterCb) {
+  selectedRegistroRows.clear();
+  if (masterCb.checked) registroFiltered.forEach((_, i) => selectedRegistroRows.add(i));
+  document.querySelectorAll('.reg-row-cb').forEach(cb => cb.checked = masterCb.checked);
+  updateRegistroBulkBar();
+}
+
+function updateRegistroBulkBar() {
+  const bar = document.getElementById('registroBulkBar');
+  if (selectedRegistroRows.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('registroBulkCount').textContent =
+      selectedRegistroRows.size + ' fila' + (selectedRegistroRows.size > 1 ? 's' : '') + ' seleccionada' + (selectedRegistroRows.size > 1 ? 's' : '');
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearRegistroSelection() {
+  selectedRegistroRows.clear();
+  document.querySelectorAll('.reg-row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('regCheckAll');
+  if (ca) { ca.checked = false; ca.indeterminate = false; }
+  updateRegistroBulkBar();
+}
+
+function exportRegistroSelected() {
+  const rows = [...selectedRegistroRows].map(i => registroFiltered[i]);
+  downloadXLS('seleccion_registro.xls', rows, 'Registro');
+}
+
+function exportRegistro() {
+  downloadXLS('registro_ingresos.xls', registroFiltered, 'Registro');
+}
+
+// Columnas que se muestran con badge de color (tipo MES)
+const BADGE_COLS = ['MES'];
+// Columnas numéricas
+const NUM_COLS   = ['CANT.','CANT','CANTIDAD','QUANTITY','ORD'];
+
+function renderRegistroTable(rows) {
+  const tbody = document.getElementById('registroBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${registroKeys.length + 1}" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>`;
+    document.getElementById('registroCount').textContent = '0 registros';
+    if (document.getElementById('registroTotal')) document.getElementById('registroTotal').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const isSelected = selectedRegistroRows.has(i);
+    const cells = registroKeys.map(k => {
+      const v = r[k] || '';
+      const ku = k.trim().toUpperCase();
+      if (BADGE_COLS.some(b => ku.includes(b))) {
+        const cap = String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase();
+        return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${cap || '—'}</span></td>`;
+      }
+      if (NUM_COLS.some(n => ku === n)) {
+        return `<td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(v||0).toLocaleString('es-PE')}</td>`;
+      }
+      // OC / REFERENTE style
+      if (ku === 'REFERENTE' || ku === 'ORD') {
+        return `<td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${v}</td>`;
+      }
+      // Material
+      if (ku === 'MATERIAL NUMBER' || ku === 'MATERIAL') {
+        return `<td class="px-md py-sm font-semibold text-body-md text-on-surface">${v}</td>`;
+      }
+      // Description truncate
+      if (ku.includes('DESCRIPTION') || ku.includes('ARTICLE') || ku.includes('DESC')) {
+        return `<td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${v}">${v}</td>`;
+      }
+      return `<td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${v}</td>`;
+    }).join('');
+
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}">
+      <td class="px-md py-sm">
+        <input type="checkbox" class="reg-row-cb rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" ${isSelected?'checked':''} onchange="toggleRegistroRow(${i}, this)"/>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('registroCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
 }
 
 // ========== RENDER DETALLE ==========
@@ -752,7 +937,7 @@ function clearSelection() {
 
 function exportSelected() {
   const rows = [...selectedRows].map(i => detalleFiltered[i]);
-  downloadXLS('seleccion_detalle.xls', rows, 'Seleccion');
+  download('seleccion_detalle.csv', Papa.unparse(rows), 'text/csv');
 }
 
 // ========== SORTING ==========
@@ -778,7 +963,7 @@ function sortDetalle(col) {
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
@@ -788,7 +973,6 @@ function renderDetalleTable(rows) {
     const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
     const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
     const oc   = colVal(r, ['REFERENTE']);
-    const prov = colVal(r, ['PROVEEDOR','PROVIDER','PROVEEDOR_COD']);
     const doc  = colVal(r, ['DOCUMENTO']);
     const mat  = colVal(r, ['MATERIAL NUMBER']);
     const desc = colVal(r, ['ARTICLE DESCRIPTION']);
@@ -806,7 +990,6 @@ function renderDetalleTable(rows) {
       </td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
       <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
-      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${prov || '—'}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
       <td class="px-md py-sm font-semibold text-body-md text-on-surface">${mat}</td>
       <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
@@ -952,7 +1135,7 @@ function filterPanelTable() {
 function renderPanelTable(rows) {
   const tbody = document.getElementById('panelRecentTable');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
     document.getElementById('panelTableCount').textContent = '0 registros';
     document.getElementById('panelTableTotal').textContent = '';
     return;
@@ -961,7 +1144,6 @@ function renderPanelTable(rows) {
     const mes  = getMesFromRegistro(r);
     const mesCap = mes ? mes.charAt(0).toUpperCase()+mes.slice(1) : '—';
     const fec  = colVal(r,['REGISTRO']).split(' ')[0];
-    const prov = colVal(r,['PROVEEDOR','PROVIDER','PROVEEDOR_COD']);
     const oc   = colVal(r,['REFERENTE']);
     const doc  = colVal(r,['DOCUMENTO']);
     const mat  = colVal(r,['MATERIAL NUMBER']);
@@ -970,7 +1152,6 @@ function renderPanelTable(rows) {
     return `<tr class="hover:bg-blue-50/40 transition-colors">
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
-      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${prov || '—'}</td>
       <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${oc}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
       <td class="px-md py-sm font-semibold text-body-md">${mat}</td>
