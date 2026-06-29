@@ -367,8 +367,8 @@
 
       <!-- Table -->
       <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
-        <div class="overflow-auto max-h-[620px] hide-scrollbar">
-          <table class="w-full text-left border-collapse">
+        <div class="overflow-auto max-h-[620px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
             <thead id="registroHead" class="bg-surface-container-low sticky top-0 z-10">
               <tr><th class="px-md py-md font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
             </thead>
@@ -399,7 +399,7 @@
             <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
           </button>
           <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">download</span> Exportar CSV
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
           </button>
         </div>
       </div>
@@ -799,7 +799,7 @@ function renderRegistroTable(rows) {
         const cap = String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase();
         return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${cap || '—'}</span></td>`;
       }
-      if (NUM_COLS.some(n => ku === n)) {
+      if (NUM_COLS.some(n => ku === n) && ku !== 'ORD') {
         return `<td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(v||0).toLocaleString('es-PE')}</td>`;
       }
       // OC / REFERENTE style
@@ -1242,11 +1242,36 @@ function buildFilename(rows, prefix) {
 
 function exportDetalle() {
   const rows = detalleFiltered.length ? detalleFiltered : detalleData;
-  downloadXLSX(buildFilename(rows, 'Detalle'), rows, 'Detalle');
+  // Exportar con cabeceras visuales igual a la tabla
+  const mapped = rows.map(r => ({
+    'MES':         getMesFromRegistro(r),
+    'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
+    'OC':          colVal(r, ['REFERENTE']),
+    'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
+    'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
+    'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
+    'EAN':         colVal(r, ['EAN-CODE','COD-EAN']),
+    'LOTE':        colVal(r, ['LOTE']),
+    'EXPIRA':      colVal(r, ['EXPIRA']),
+    'CANTIDAD':    colVal(r, ['CANT.','CANT']),
+  }));
+  downloadXLSX(buildFilename(rows, 'Detalle'), mapped, 'Detalle');
 }
 function exportSelected() {
   const rows = [...selectedRows].map(i => detalleFiltered[i]);
-  downloadXLSX(buildFilename(rows, 'Seleccion'), rows, 'Seleccion');
+  const mapped = rows.map(r => ({
+    'MES':         getMesFromRegistro(r),
+    'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
+    'OC':          colVal(r, ['REFERENTE']),
+    'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
+    'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
+    'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
+    'EAN':         colVal(r, ['EAN-CODE','COD-EAN']),
+    'LOTE':        colVal(r, ['LOTE']),
+    'EXPIRA':      colVal(r, ['EXPIRA']),
+    'CANTIDAD':    colVal(r, ['CANT.','CANT']),
+  }));
+  downloadXLSX(buildFilename(rows, 'Seleccion'), mapped, 'Seleccion');
 }
 function exportPanel() {
   downloadXLSX(buildFilename(detalleData, 'Panel'), detalleData, 'Panel');
