@@ -1166,24 +1166,57 @@ function renderPanelTable(rows) {
 }
 
 // ========== EXPORT XLS ==========
+// Columnas que SIEMPRE deben ser texto (nunca número) para evitar notación científica
+const FORCE_TEXT_COLS = ['ID','EAN','LOTE','LOT','BATCH','COD','CODE','CODIGO','BARCODE',
+  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL NUMBER','REFERENTE','DOCUMENTO','ORD',
+  'REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES'];
+
+function colIsText(colName) {
+  const cu = colName.trim().toUpperCase();
+  return FORCE_TEXT_COLS.some(f => cu.includes(f));
+}
+
 function toXLS(data, sheetName) {
-  // Genera XLS real usando formato XML SpreadsheetML (abre en Excel sin plugins)
-  const cols = data.length ? Object.keys(data[0]) : [];
+  if (!data.length) return '';
+  const cols = Object.keys(data[0]);
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const header = cols.map(c => `<Cell><Data ss:Type="String">${esc(c)}</Data></Cell>`).join('');
+
+  const header = cols.map(c =>
+    `<Cell ss:StyleID="header"><Data ss:Type="String">${esc(c)}</Data></Cell>`
+  ).join('');
+
   const rows = data.map(r =>
     '<Row>' + cols.map(c => {
-      const v = r[c] ?? '';
-      const n = parseFloat(String(v).replace(/[^0-9.-]/g,''));
-      const type = !isNaN(n) && String(v).trim() !== '' ? 'Number' : 'String';
-      return `<Cell><Data ss:Type="${type}">${esc(type==='Number'?n:v)}</Data></Cell>`;
+      const raw = r[c] ?? '';
+      const v   = String(raw).trim();
+      // Forzar texto en columnas de código/ID/EAN aunque parezcan números
+      if (colIsText(c)) {
+        return `<Cell ss:StyleID="text"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+      }
+      const n = parseFloat(v.replace(/,/g,''));
+      const isNum = !isNaN(n) && v !== '' && !/^0\d/.test(v); // evitar "0123" como número
+      return isNum
+        ? `<Cell><Data ss:Type="Number">${n}</Data></Cell>`
+        : `<Cell ss:StyleID="text"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
     }).join('') + '</Row>'
   ).join('');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="${esc(sheetName)}">
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel">
+  <Styles>
+    <Style ss:ID="header">
+      <Font ss:Bold="1"/>
+      <Interior ss:Color="#1a73e8" ss:Pattern="Solid"/>
+      <Font ss:Color="#FFFFFF" ss:Bold="1"/>
+    </Style>
+    <Style ss:ID="text">
+      <NumberFormat ss:Format="@"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="${esc(sheetName.substring(0,31))}">
     <Table>
       <Row>${header}</Row>
       ${rows}
@@ -1193,18 +1226,57 @@ function toXLS(data, sheetName) {
 }
 
 function downloadXLS(filename, data, sheetName) {
-  const xml = toXLS(data, sheetName);
-  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  if (!data || !data.length) { alert('No hay datos para exportar.'); return; }
+  const xml  = toXLS(data, sheetName);
+  const blob = new Blob(['\uFEFF' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-function exportDetalle()     { downloadXLS('detalle_ingresos.xls',    detalleFiltered,   'Detalle'); }
-function exportSelected()    { downloadXLS('seleccion_detalle.xls',   [...selectedRows].map(i=>detalleFiltered[i]), 'Seleccion'); }
-function exportPanel()       { downloadXLS('panel_ingresos.xls',      detalleData,       'Panel'); }
-function exportPanelTable()  { downloadXLS('tabla_panel.xls',         panelTableFiltered.length ? panelTableFiltered : panelTableData, 'Ingresos'); }
+// Genera nombre de archivo dinámico: PROVEEDOR_FECHA.xls
+function buildFilename(rows, prefix) {
+  const hoy = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  // Obtener el DOCUMENTO más frecuente como identificador de proveedor
+  if (rows && rows.length) {
+    const docCount = {};
+    rows.forEach(r => {
+      const d = colVal(r, ['DOCUMENTO']) || colVal(r, ['REFERENTE']) || '';
+      if (d) docCount[d] = (docCount[d] || 0) + 1;
+    });
+    const topDoc = Object.entries(docCount).sort((a,b) => b[1]-a[1])[0];
+    if (topDoc) {
+      const safe = topDoc[0].replace(/[^a-zA-Z0-9\-]/g,'_');
+      return `${prefix}_${safe}_${fecha}.xls`;
+    }
+  }
+  return `${prefix}_${fecha}.xls`;
+}
+
+function exportDetalle() {
+  const rows = detalleFiltered.length ? detalleFiltered : detalleData;
+  downloadXLS(buildFilename(rows, 'Detalle'), rows, 'Detalle');
+}
+function exportSelected() {
+  const rows = [...selectedRows].map(i => detalleFiltered[i]);
+  downloadXLS(buildFilename(rows, 'Seleccion'), rows, 'Seleccion');
+}
+function exportPanel()      { downloadXLS(buildFilename(detalleData,  'Panel'),   detalleData,   'Panel'); }
+function exportPanelTable() {
+  const rows = panelTableFiltered.length ? panelTableFiltered : panelTableData;
+  downloadXLS(buildFilename(rows, 'Panel_Detalle'), rows, 'Ingresos');
+}
+function exportRegistro() {
+  const rows = registroFiltered.length ? registroFiltered : registroData;
+  downloadXLS(buildFilename(rows, 'Registro'), rows, 'Registro');
+}
+function exportRegistroSelected() {
+  const rows = [...selectedRegistroRows].map(i => registroFiltered[i]);
+  downloadXLS(buildFilename(rows, 'Reg_Seleccion'), rows, 'Registro');
+}
 
 function download(name, content, type) {
   const a = document.createElement('a');
