@@ -11,6 +11,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script id="tailwind-config">
   tailwind.config = {
     darkMode: "class",
@@ -1165,82 +1166,65 @@ function renderPanelTable(rows) {
   document.getElementById('panelTableTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
 }
 
-// ========== EXPORT XLS ==========
-// Columnas que SIEMPRE deben ser texto (nunca número) para evitar notación científica
-const FORCE_TEXT_COLS = ['ID','EAN','LOTE','LOT','BATCH','COD','CODE','CODIGO','BARCODE',
-  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL NUMBER','REFERENTE','DOCUMENTO','ORD',
-  'REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES'];
+// ========== EXPORT XLSX (SheetJS) ==========
+// Columnas que deben ser texto para evitar notación científica
+const FORCE_TEXT_COLS = ['ID','EAN','LOTE','COD','CODE','CODIGO','BARCODE',
+  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL NUMBER','REFERENTE','DOCUMENTO',
+  'ORD','REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES','PROVEEDOR'];
 
 function colIsText(colName) {
   const cu = colName.trim().toUpperCase();
   return FORCE_TEXT_COLS.some(f => cu.includes(f));
 }
 
-function toXLS(data, sheetName) {
-  if (!data.length) return '';
-  const cols = Object.keys(data[0]);
-  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-  const header = cols.map(c =>
-    `<Cell ss:StyleID="header"><Data ss:Type="String">${esc(c)}</Data></Cell>`
-  ).join('');
-
-  const rows = data.map(r =>
-    '<Row>' + cols.map(c => {
-      const raw = r[c] ?? '';
-      const v   = String(raw).trim();
-      // Forzar texto en columnas de código/ID/EAN aunque parezcan números
-      if (colIsText(c)) {
-        return `<Cell ss:StyleID="text"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
-      }
-      const n = parseFloat(v.replace(/,/g,''));
-      const isNum = !isNaN(n) && v !== '' && !/^0\d/.test(v); // evitar "0123" como número
-      return isNum
-        ? `<Cell><Data ss:Type="Number">${n}</Data></Cell>`
-        : `<Cell ss:StyleID="text"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
-    }).join('') + '</Row>'
-  ).join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:x="urn:schemas-microsoft-com:office:excel">
-  <Styles>
-    <Style ss:ID="header">
-      <Font ss:Bold="1"/>
-      <Interior ss:Color="#1a73e8" ss:Pattern="Solid"/>
-      <Font ss:Color="#FFFFFF" ss:Bold="1"/>
-    </Style>
-    <Style ss:ID="text">
-      <NumberFormat ss:Format="@"/>
-    </Style>
-  </Styles>
-  <Worksheet ss:Name="${esc(sheetName.substring(0,31))}">
-    <Table>
-      <Row>${header}</Row>
-      ${rows}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-}
-
-function downloadXLS(filename, data, sheetName) {
+function downloadXLSX(filename, data, sheetName) {
   if (!data || !data.length) { alert('No hay datos para exportar.'); return; }
-  const xml  = toXLS(data, sheetName);
-  const blob = new Blob(['\uFEFF' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+  const cols = Object.keys(data[0]);
+
+  // Construir array de arrays: encabezado + filas
+  const aoaHeader = cols;
+  const aoaRows   = data.map(r =>
+    cols.map(c => {
+      const v = r[c] ?? '';
+      // Forzar string en columnas de código/ID/EAN
+      if (colIsText(c)) return String(v);
+      const n = parseFloat(String(v).replace(/,/g,''));
+      // Evitar convertir "0123" o strings con letras a número
+      if (!isNaN(n) && String(v).trim() !== '' && !/[a-zA-Z]/.test(v) && !/^0\d/.test(String(v).trim())) return n;
+      return String(v);
+    })
+  );
+
+  const aoa = [aoaHeader, ...aoaRows];
+  const ws  = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Forzar formato texto (@) en columnas que lo necesitan
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  cols.forEach((c, ci) => {
+    if (colIsText(c)) {
+      for (let ri = 1; ri <= range.e.r; ri++) {
+        const cellAddr = XLSX.utils.encode_cell({ r: ri, c: ci });
+        if (ws[cellAddr]) ws[cellAddr].t = 's'; // forzar tipo string
+      }
+    }
+  });
+
+  // Ancho de columnas automático
+  ws['!cols'] = cols.map((c, ci) => {
+    const maxLen = Math.max(c.length, ...aoaRows.map(r => String(r[ci]||'').length));
+    return { wch: Math.min(maxLen + 2, 40) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+  XLSX.writeFile(wb, filename);
 }
 
-// Genera nombre de archivo dinámico: PROVEEDOR_FECHA.xls
+// Nombre dinámico: PREFIJO_DOCUMENTO_FECHA.xlsx
 function buildFilename(rows, prefix) {
-  const hoy = new Date();
+  const hoy   = new Date();
   const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
-  // Obtener el DOCUMENTO más frecuente como identificador de proveedor
   if (rows && rows.length) {
     const docCount = {};
     rows.forEach(r => {
@@ -1250,32 +1234,34 @@ function buildFilename(rows, prefix) {
     const topDoc = Object.entries(docCount).sort((a,b) => b[1]-a[1])[0];
     if (topDoc) {
       const safe = topDoc[0].replace(/[^a-zA-Z0-9\-]/g,'_');
-      return `${prefix}_${safe}_${fecha}.xls`;
+      return `${prefix}_${safe}_${fecha}.xlsx`;
     }
   }
-  return `${prefix}_${fecha}.xls`;
+  return `${prefix}_${fecha}.xlsx`;
 }
 
 function exportDetalle() {
   const rows = detalleFiltered.length ? detalleFiltered : detalleData;
-  downloadXLS(buildFilename(rows, 'Detalle'), rows, 'Detalle');
+  downloadXLSX(buildFilename(rows, 'Detalle'), rows, 'Detalle');
 }
 function exportSelected() {
   const rows = [...selectedRows].map(i => detalleFiltered[i]);
-  downloadXLS(buildFilename(rows, 'Seleccion'), rows, 'Seleccion');
+  downloadXLSX(buildFilename(rows, 'Seleccion'), rows, 'Seleccion');
 }
-function exportPanel()      { downloadXLS(buildFilename(detalleData,  'Panel'),   detalleData,   'Panel'); }
+function exportPanel() {
+  downloadXLSX(buildFilename(detalleData, 'Panel'), detalleData, 'Panel');
+}
 function exportPanelTable() {
   const rows = panelTableFiltered.length ? panelTableFiltered : panelTableData;
-  downloadXLS(buildFilename(rows, 'Panel_Detalle'), rows, 'Ingresos');
+  downloadXLSX(buildFilename(rows, 'Panel_Detalle'), rows, 'Ingresos');
 }
 function exportRegistro() {
   const rows = registroFiltered.length ? registroFiltered : registroData;
-  downloadXLS(buildFilename(rows, 'Registro'), rows, 'Registro');
+  downloadXLSX(buildFilename(rows, 'Registro'), rows, 'Registro');
 }
 function exportRegistroSelected() {
   const rows = [...selectedRegistroRows].map(i => registroFiltered[i]);
-  downloadXLS(buildFilename(rows, 'Reg_Seleccion'), rows, 'Registro');
+  downloadXLSX(buildFilename(rows, 'Reg_Seleccion'), rows, 'Registro');
 }
 
 function download(name, content, type) {
