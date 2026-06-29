@@ -281,6 +281,7 @@
               <tr>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
@@ -289,7 +290,7 @@
               </tr>
             </thead>
             <tbody id="panelRecentTable" class="divide-y divide-outline-variant">
-              <tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="8" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -360,7 +361,7 @@
             <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
           </button>
           <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">download</span> Exportar CSV
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
           </button>
         </div>
       </div>
@@ -421,6 +422,7 @@
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('mes')">MES <span class="material-symbols-outlined text-[12px]" id="sort-mes">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('fecha')">FECHA <span class="material-symbols-outlined text-[12px]" id="sort-fecha">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('oc')">OC <span class="material-symbols-outlined text-[12px]" id="sort-oc">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
@@ -431,7 +433,7 @@
               </tr>
             </thead>
             <tbody id="detalleBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -523,7 +525,7 @@ async function loadAllData() {
     console.error(e);
     document.getElementById('syncStatus').textContent = 'Error al cargar datos';
     document.getElementById('panelRecentTable').innerHTML =
-      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
+      '<tr><td colspan="8" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
   }
 }
 
@@ -750,7 +752,7 @@ function clearSelection() {
 
 function exportSelected() {
   const rows = [...selectedRows].map(i => detalleFiltered[i]);
-  download('seleccion_detalle.csv', Papa.unparse(rows), 'text/csv');
+  downloadXLS('seleccion_detalle.xls', rows, 'Seleccion');
 }
 
 // ========== SORTING ==========
@@ -776,7 +778,7 @@ function sortDetalle(col) {
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
@@ -786,6 +788,7 @@ function renderDetalleTable(rows) {
     const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
     const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
     const oc   = colVal(r, ['REFERENTE']);
+    const prov = colVal(r, ['PROVEEDOR','PROVIDER','PROVEEDOR_COD']);
     const doc  = colVal(r, ['DOCUMENTO']);
     const mat  = colVal(r, ['MATERIAL NUMBER']);
     const desc = colVal(r, ['ARTICLE DESCRIPTION']);
@@ -803,6 +806,7 @@ function renderDetalleTable(rows) {
       </td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
       <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${prov || '—'}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
       <td class="px-md py-sm font-semibold text-body-md text-on-surface">${mat}</td>
       <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
@@ -948,7 +952,7 @@ function filterPanelTable() {
 function renderPanelTable(rows) {
   const tbody = document.getElementById('panelRecentTable');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
     document.getElementById('panelTableCount').textContent = '0 registros';
     document.getElementById('panelTableTotal').textContent = '';
     return;
@@ -957,6 +961,7 @@ function renderPanelTable(rows) {
     const mes  = getMesFromRegistro(r);
     const mesCap = mes ? mes.charAt(0).toUpperCase()+mes.slice(1) : '—';
     const fec  = colVal(r,['REGISTRO']).split(' ')[0];
+    const prov = colVal(r,['PROVEEDOR','PROVIDER','PROVEEDOR_COD']);
     const oc   = colVal(r,['REFERENTE']);
     const doc  = colVal(r,['DOCUMENTO']);
     const mat  = colVal(r,['MATERIAL NUMBER']);
@@ -965,6 +970,7 @@ function renderPanelTable(rows) {
     return `<tr class="hover:bg-blue-50/40 transition-colors">
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${prov || '—'}</td>
       <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${oc}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
       <td class="px-md py-sm font-semibold text-body-md">${mat}</td>
