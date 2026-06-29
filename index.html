@@ -1459,6 +1459,9 @@ function normalizeFecha(v) {
   if (/^\d{2}\/\d{2}\/\d{4} /.test(s)) return s.split(' ')[0];
   return s;
 }
+
+// Mes-Año desde fecha DD/MM/YYYY
+function mesAnioFromFecha(fechaStr) {
   if (!fechaStr) return '';
   const parts = fechaStr.split('/');
   if (parts.length < 3) return '';
