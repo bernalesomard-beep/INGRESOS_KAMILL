@@ -241,33 +241,62 @@
       </section>
 
       <!-- Recent Detalle Table in Panel -->
-      <section class="col-span-12 bg-surface-container-lowest rounded-xl ghost-border overflow-hidden">
+      <section class="col-span-12 bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <!-- Header -->
         <div class="px-lg py-md border-b border-outline-variant flex justify-between items-center">
           <div>
-            <h4 class="font-headline-sm text-headline-sm text-on-surface">Últimos Ingresos</h4>
-            <p class="text-body-sm text-on-surface-variant">Registros recientes del detalle de ingresos</p>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface">Detalle de Ingresos</h4>
+            <p class="text-body-sm text-on-surface-variant">Todos los registros ordenados del más reciente al primero</p>
           </div>
-          <button onclick="showSection('detalle')" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
-            Ver todo <span class="material-symbols-outlined">arrow_forward</span>
-          </button>
+          <div class="flex gap-md">
+            <button onclick="exportPanelTable()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+              <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
+            </button>
+            <button onclick="showSection('detalle')" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+              Ir a Detalle <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          </div>
         </div>
-        <div class="overflow-auto max-h-[300px] hide-scrollbar">
+        <!-- Filters (no afectan gráfico ni KPIs) -->
+        <div class="px-lg py-md bg-surface-container-low/40 border-b border-outline-variant grid grid-cols-1 md:grid-cols-3 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="panelMesFilter" onchange="filterPanelTable()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Documento</label>
+            <input id="panelDocFilter" oninput="filterPanelTable()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Material</label>
+            <input id="panelMatFilter" oninput="filterPanelTable()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
+          </div>
+        </div>
+        <!-- Table -->
+        <div class="overflow-auto max-h-[480px] hide-scrollbar">
           <table class="w-full text-left border-collapse">
             <thead class="bg-surface-container-low sticky top-0 z-10">
               <tr>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
               </tr>
             </thead>
             <tbody id="panelRecentTable" class="divide-y divide-outline-variant">
-              <tr><td colspan="7" class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="panelTableCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="panelTableTotal" class="text-body-sm font-bold text-primary">—</span>
         </div>
       </section>
     </div>
@@ -882,40 +911,114 @@ function renderPanel() {
     }
   });
 
-  // --- Recent table in panel (last 10 rows of detalle) ---
-  const recent = [...detalleData].reverse().slice(0, 10);
-  document.getElementById('panelRecentTable').innerHTML = recent.length ?
-    recent.map(r => {
-      const mes  = getMesFromRegistro(r);
-      const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '';
-      const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
-      const oc   = colVal(r, ['REFERENTE']);
-      const doc  = colVal(r, ['DOCUMENTO']);
-      const mat  = colVal(r, ['MATERIAL NUMBER']);
-      const desc = colVal(r, ['ARTICLE DESCRIPTION']);
-      const qty  = colVal(r, ['CANT.', 'CANT']);
-      return `<tr class="hover:bg-surface-container-high transition-colors">
-        <td class="px-lg py-lg text-on-surface-variant font-label-md">${mesCap}</td>
-        <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
-        <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
-        <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
-        <td class="px-lg py-lg font-semibold text-body-md">${mat}</td>
-        <td class="px-lg py-lg text-on-surface-variant truncate max-w-[150px]">${desc}</td>
-        <td class="px-lg py-lg text-right font-mono-data font-bold text-on-surface">${qty}</td>
-      </tr>`;
-    }).join('')
-    : '<tr><td colspan="7" class="px-lg py-lg text-center text-on-surface-variant">Sin datos</td></tr>';
+  // --- Panel table: todos los registros ordenados más reciente primero ---
+  panelTableData = [...detalleData].sort((a, b) => {
+    const da = new Date(colVal(a,['REGISTRO']).replace(/(\d{2})\/(\d{2})\/(\d{4})/,'$3-$2-$1'));
+    const db = new Date(colVal(b,['REGISTRO']).replace(/(\d{2})\/(\d{2})\/(\d{4})/,'$3-$2-$1'));
+    return db - da;
+  });
+
+  // Populate panel mes filter
+  const panelMeses = MESES_ES.filter(m => panelTableData.some(r => getMesFromRegistro(r) === m));
+  const selPanel = document.getElementById('panelMesFilter');
+  selPanel.innerHTML = '<option value="">Todos los meses</option>' +
+    panelMeses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('');
+
+  filterPanelTable();
 }
 
-// ========== EXPORT ==========
-function exportDetalle() {
-  const csv = Papa.unparse(detalleFiltered);
-  download('detalle_ingresos.csv', csv, 'text/csv');
+// ========== PANEL TABLE FILTER (independiente de KPIs y gráfico) ==========
+let panelTableData = [];
+let panelTableFiltered = [];
+
+function filterPanelTable() {
+  const mes = (document.getElementById('panelMesFilter')?.value || '').toLowerCase();
+  const doc = (document.getElementById('panelDocFilter')?.value || '').toLowerCase();
+  const mat = (document.getElementById('panelMatFilter')?.value || '').toLowerCase();
+
+  panelTableFiltered = panelTableData.filter(r => {
+    if (mes && getMesFromRegistro(r).toLowerCase() !== mes) return false;
+    if (doc && !colVal(r,['DOCUMENTO']).toLowerCase().includes(doc)) return false;
+    if (mat && !colVal(r,['MATERIAL NUMBER']).toLowerCase().includes(mat)) return false;
+    return true;
+  });
+  renderPanelTable(panelTableFiltered);
 }
-function exportPanel() {
-  const csv = Papa.unparse(detalleData);
-  download('panel_ingresos.csv', csv, 'text/csv');
+
+function renderPanelTable(rows) {
+  const tbody = document.getElementById('panelRecentTable');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('panelTableCount').textContent = '0 registros';
+    document.getElementById('panelTableTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const mes  = getMesFromRegistro(r);
+    const mesCap = mes ? mes.charAt(0).toUpperCase()+mes.slice(1) : '—';
+    const fec  = colVal(r,['REGISTRO']).split(' ')[0];
+    const oc   = colVal(r,['REFERENTE']);
+    const doc  = colVal(r,['DOCUMENTO']);
+    const mat  = colVal(r,['MATERIAL NUMBER']);
+    const desc = colVal(r,['ARTICLE DESCRIPTION']);
+    const qty  = colVal(r,['CANT.','CANT']);
+    return `<tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${oc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
+      <td class="px-md py-sm font-semibold text-body-md">${mat}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = rows.reduce((s,r) => s + getCantidad(r), 0);
+  document.getElementById('panelTableCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('panelTableTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
 }
+
+// ========== EXPORT XLS ==========
+function toXLS(data, sheetName) {
+  // Genera XLS real usando formato XML SpreadsheetML (abre en Excel sin plugins)
+  const cols = data.length ? Object.keys(data[0]) : [];
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const header = cols.map(c => `<Cell><Data ss:Type="String">${esc(c)}</Data></Cell>`).join('');
+  const rows = data.map(r =>
+    '<Row>' + cols.map(c => {
+      const v = r[c] ?? '';
+      const n = parseFloat(String(v).replace(/[^0-9.-]/g,''));
+      const type = !isNaN(n) && String(v).trim() !== '' ? 'Number' : 'String';
+      return `<Cell><Data ss:Type="${type}">${esc(type==='Number'?n:v)}</Data></Cell>`;
+    }).join('') + '</Row>'
+  ).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="${esc(sheetName)}">
+    <Table>
+      <Row>${header}</Row>
+      ${rows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+}
+
+function downloadXLS(filename, data, sheetName) {
+  const xml = toXLS(data, sheetName);
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function exportDetalle()     { downloadXLS('detalle_ingresos.xls',    detalleFiltered,   'Detalle'); }
+function exportSelected()    { downloadXLS('seleccion_detalle.xls',   [...selectedRows].map(i=>detalleFiltered[i]), 'Seleccion'); }
+function exportPanel()       { downloadXLS('panel_ingresos.xls',      detalleData,       'Panel'); }
+function exportPanelTable()  { downloadXLS('tabla_panel.xls',         panelTableFiltered.length ? panelTableFiltered : panelTableData, 'Ingresos'); }
+
 function download(name, content, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content], {type}));
