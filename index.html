@@ -406,12 +406,14 @@
 <script>
 // ========== CONFIG ==========
 const CSV_REGISTRO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
-const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
+const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
 
-// Use a CORS proxy to avoid cross-origin issues when opening as a local file
-function proxyUrl(url) {
-  // Try direct first; if CORS fails (local file), use allorigins proxy
-  return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+// Fetch CSV con reintentos directos (Google Sheets pub CSV permite CORS desde navegador)
+async function fetchCSVDirect(url) {
+  const resp = await fetch(url, { cache: 'no-store' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const text = await resp.text();
+  return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
 // ========== STATE ==========
@@ -444,26 +446,17 @@ function onSearch() {
 }
 
 // ========== LOAD DATA ==========
-async function fetchCSV(url) {
-  return new Promise((resolve, reject) => {
-    Papa.parse(proxyUrl(url), {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: r => resolve(r.data),
-      error: e => reject(e)
-    });
-  });
-}
-
 async function loadAllData() {
   document.getElementById('syncStatus').textContent = 'Sincronizando...';
   try {
-    const [reg, det] = await Promise.all([fetchCSV(CSV_REGISTRO), fetchCSV(CSV_DETALLE)]);
+    const [reg, det] = await Promise.all([
+      fetchCSVDirect(CSV_REGISTRO),
+      fetchCSVDirect(CSV_DETALLE)
+    ]);
     registroData = reg;
-    detalleData = det;
+    detalleData  = det;
     registroFiltered = [...reg];
-    detalleFiltered = [...det];
+    detalleFiltered  = [...det];
 
     const now = new Date();
     document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit'});
@@ -473,32 +466,9 @@ async function loadAllData() {
     renderPanel();
   } catch(e) {
     console.error(e);
-    document.getElementById('syncStatus').textContent = 'Error de sincronización';
-    // Try direct URL as fallback
-    loadDirect();
-  }
-}
-
-async function loadDirect() {
-  // Fallback: direct fetch (works if running from a server)
-  try {
-    const [r1, r2] = await Promise.all([
-      fetch(CSV_REGISTRO).then(r => r.text()),
-      fetch(CSV_DETALLE).then(r => r.text())
-    ]);
-    registroData = Papa.parse(r1, {header:true, skipEmptyLines:true}).data;
-    detalleData  = Papa.parse(r2, {header:true, skipEmptyLines:true}).data;
-    registroFiltered = [...registroData];
-    detalleFiltered  = [...detalleData];
-
-    const now = new Date();
-    document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
-    renderRegistro();
-    renderDetalle();
-    renderPanel();
-  } catch(e) {
-    document.getElementById('syncStatus').textContent = 'Sin conexión';
-    document.getElementById('panelRecentTable').innerHTML = '<tr><td colspan="7" class="px-lg py-lg text-center text-error">No se pudo conectar a Google Sheets. Verifica tu conexión.</td></tr>';
+    document.getElementById('syncStatus').textContent = 'Error al cargar datos';
+    document.getElementById('panelRecentTable').innerHTML =
+      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ No se pudo conectar a Google Sheets.<br>Asegúrate de que las hojas estén publicadas como CSV (Archivo → Compartir → Publicar en la web → CSV).</td></tr>';
   }
 }
 
