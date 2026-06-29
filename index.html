@@ -320,63 +320,96 @@
   <!-- ===== DETALLE SECTION ===== -->
   <div id="section-detalle" class="section-content">
     <section class="mb-xl">
-      <div class="flex justify-between items-end mb-lg">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
         <div>
           <h2 class="font-display-lg text-display-lg text-on-surface">Detalle de Ingresos</h2>
-          <p class="text-body-sm text-on-surface-variant mt-xs">Datos de la hoja de Detalle</p>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Vista completa de materiales ingresados</p>
         </div>
         <div class="flex gap-md">
-          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
-            <span class="material-symbols-outlined">refresh</span> Actualizar
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
           </button>
-          <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
-            <span class="material-symbols-outlined">download</span> Exportar
+          <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar CSV
           </button>
         </div>
       </div>
 
-      <div class="bg-surface-container-lowest rounded-xl ghost-border overflow-hidden">
-        <!-- Filters -->
-        <div class="px-lg py-md bg-surface-container-low/50 border-b border-outline-variant flex flex-wrap gap-md">
-          <div class="flex-1 min-w-[150px]">
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearDetalleFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
             <label class="form-label">Mes</label>
             <select id="detalleMesFilter" onchange="filterDetalle()" class="form-input">
-              <option value="">Todos</option>
+              <option value="">Todos los meses</option>
             </select>
           </div>
-          <div class="flex-1 min-w-[150px]">
-            <label class="form-label">Documento</label>
-            <input id="detalleDocFilter" oninput="filterDetalle()" class="form-input" placeholder="Buscar FAC..." type="text"/>
+          <div>
+            <label class="form-label">OC / Referente</label>
+            <input id="detalleOcFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: T001-00008729" type="text"/>
           </div>
-          <div class="flex-1 min-w-[150px]">
+          <div>
+            <label class="form-label">Documento</label>
+            <input id="detalleDocFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+          </div>
+          <div>
             <label class="form-label">Material</label>
-            <input id="detalleMtFilter" oninput="filterDetalle()" class="form-input" placeholder="Buscar MT..." type="text"/>
+            <input id="detalleMtFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
           </div>
         </div>
-        <div class="overflow-auto max-h-[600px] hide-scrollbar">
+        <!-- Active filter chips -->
+        <div id="filterChips" class="hidden px-lg pb-md flex flex-wrap gap-xs"></div>
+      </div>
+
+      <!-- Bulk action bar (shown when rows selected) -->
+      <div id="bulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="bulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportSelected()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar selección
+          </button>
+          <button onclick="clearSelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
           <table class="w-full text-left border-collapse">
             <thead class="bg-surface-container-low sticky top-0 z-10">
               <tr>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EAN</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LOTE</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EXPIRA</th>
-                <th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
+                <th class="px-md py-md w-10">
+                  <input id="checkAll" type="checkbox" onchange="toggleAllRows(this)" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"/>
+                </th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('mes')">MES <span class="material-symbols-outlined text-[12px]" id="sort-mes">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('fecha')">FECHA <span class="material-symbols-outlined text-[12px]" id="sort-fecha">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('oc')">OC <span class="material-symbols-outlined text-[12px]" id="sort-oc">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EAN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LOTE</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EXPIRA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('qty')">CANTIDAD <span class="material-symbols-outlined text-[12px]" id="sort-qty">unfold_more</span></th>
               </tr>
             </thead>
             <tbody id="detalleBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="10" class="px-lg py-lg text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="px-lg py-md border-t border-outline-variant flex justify-between items-center">
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
           <span id="detalleCount" class="text-body-sm text-on-surface-variant">—</span>
-          <span id="detalleTotal" class="text-body-sm font-semibold text-on-surface">—</span>
+          <span id="detalleTotal" class="text-body-sm font-bold text-primary">—</span>
         </div>
       </div>
     </section>
@@ -599,34 +632,130 @@ function renderDetalle() {
 
 function filterDetalle() {
   const mes = document.getElementById('detalleMesFilter').value.toLowerCase();
+  const oc  = (document.getElementById('detalleOcFilter')  ? document.getElementById('detalleOcFilter').value  : '').toLowerCase();
   const doc = document.getElementById('detalleDocFilter').value.toLowerCase();
   const mt  = document.getElementById('detalleMtFilter').value.toLowerCase();
 
   detalleFiltered = detalleData.filter(r => {
     const rowMes = getMesFromRegistro(r).toLowerCase();
+    const rowOc  = colVal(r, ['REFERENTE']).toLowerCase();
     const rowDoc = colVal(r, ['DOCUMENTO']).toLowerCase();
     const rowMat = colVal(r, ['MATERIAL NUMBER']).toLowerCase();
     if (mes && rowMes !== mes) return false;
+    if (oc  && !rowOc.includes(oc))  return false;
     if (doc && !rowDoc.includes(doc)) return false;
     if (mt  && !rowMat.includes(mt))  return false;
     return true;
   });
 
+  updateFilterChips({ mes, oc, doc, mt });
+  selectedRows.clear();
+  updateBulkBar();
+  renderDetalleTable(detalleFiltered);
+}
+
+function clearDetalleFilters() {
+  ['detalleMesFilter','detalleOcFilter','detalleDocFilter','detalleMtFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterDetalle();
+}
+
+function updateFilterChips(filters) {
+  const chips = document.getElementById('filterChips');
+  const labels = { mes:'Mes', oc:'OC', doc:'Documento', mt:'Material' };
+  const active = Object.entries(filters).filter(([,v]) => v);
+  if (!active.length) { chips.classList.add('hidden'); chips.innerHTML = ''; return; }
+  chips.classList.remove('hidden');
+  chips.innerHTML = active.map(([k, v]) =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      ${labels[k]}: ${v}
+      <button onclick="clearChip('${k}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`
+  ).join('');
+}
+
+function clearChip(key) {
+  const map = { mes:'detalleMesFilter', oc:'detalleOcFilter', doc:'detalleDocFilter', mt:'detalleMtFilter' };
+  const el = document.getElementById(map[key]);
+  if (el) el.value = '';
+  filterDetalle();
+}
+
+// ========== SELECTION ==========
+const selectedRows = new Set();
+
+function toggleRow(idx, cb) {
+  if (cb.checked) selectedRows.add(idx);
+  else selectedRows.delete(idx);
+  document.getElementById('checkAll').indeterminate = selectedRows.size > 0 && selectedRows.size < detalleFiltered.length;
+  document.getElementById('checkAll').checked = selectedRows.size === detalleFiltered.length && detalleFiltered.length > 0;
+  updateBulkBar();
+}
+
+function toggleAllRows(masterCb) {
+  selectedRows.clear();
+  if (masterCb.checked) detalleFiltered.forEach((_, i) => selectedRows.add(i));
+  document.querySelectorAll('.row-cb').forEach((cb, i) => cb.checked = masterCb.checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  if (selectedRows.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('bulkCount').textContent = selectedRows.size + ' fila' + (selectedRows.size > 1 ? 's' : '') + ' seleccionada' + (selectedRows.size > 1 ? 's' : '');
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearSelection() {
+  selectedRows.clear();
+  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('checkAll');
+  ca.checked = false; ca.indeterminate = false;
+  updateBulkBar();
+}
+
+function exportSelected() {
+  const rows = [...selectedRows].map(i => detalleFiltered[i]);
+  download('seleccion_detalle.csv', Papa.unparse(rows), 'text/csv');
+}
+
+// ========== SORTING ==========
+let sortCol = null, sortDir = 1;
+function sortDetalle(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  ['mes','fecha','oc','qty'].forEach(c => {
+    const el = document.getElementById('sort-' + c);
+    if (el) el.textContent = c === col ? (sortDir === 1 ? 'arrow_upward' : 'arrow_downward') : 'unfold_more';
+  });
+  detalleFiltered.sort((a, b) => {
+    let va, vb;
+    if (col === 'mes')   { va = getMesIndexFromRow(a); vb = getMesIndexFromRow(b); }
+    else if (col === 'fecha') { va = colVal(a,['REGISTRO']); vb = colVal(b,['REGISTRO']); }
+    else if (col === 'oc')   { va = colVal(a,['REFERENTE']); vb = colVal(b,['REFERENTE']); }
+    else if (col === 'qty')  { va = getCantidad(a); vb = getCantidad(b); }
+    if (va < vb) return -sortDir; if (va > vb) return sortDir; return 0;
+  });
+  selectedRows.clear(); updateBulkBar();
   renderDetalleTable(detalleFiltered);
 }
 
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="px-lg py-lg text-center text-on-surface-variant">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
   }
-  tbody.innerHTML = rows.map(r => {
+  tbody.innerHTML = rows.map((r, i) => {
     const mes  = getMesFromRegistro(r);
-    const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '';
-    const fec  = colVal(r, ['REGISTRO']).split(' ')[0]; // solo fecha sin hora
+    const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
+    const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
     const oc   = colVal(r, ['REFERENTE']);
     const doc  = colVal(r, ['DOCUMENTO']);
     const mat  = colVal(r, ['MATERIAL NUMBER']);
@@ -635,22 +764,28 @@ function renderDetalleTable(rows) {
     const lote = colVal(r, ['LOTE']);
     const exp  = colVal(r, ['EXPIRA']);
     const qty  = colVal(r, ['CANT.', 'CANT']);
-    return `<tr class="hover:bg-surface-container-high transition-colors">
-      <td class="px-lg py-lg text-on-surface-variant font-label-md">${mesCap}</td>
-      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
-      <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
-      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
-      <td class="px-lg py-lg font-semibold text-body-md">${mat}</td>
-      <td class="px-lg py-lg text-on-surface-variant truncate max-w-[150px]">${desc}</td>
-      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${ean}</td>
-      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${lote}</td>
-      <td class="px-lg py-lg text-on-surface-variant font-mono-data">${exp}</td>
-      <td class="px-lg py-lg text-right font-mono-data font-bold text-on-surface">${qty}</td>
+    const isSelected = selectedRows.has(i);
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}" data-idx="${i}">
+      <td class="px-md py-sm">
+        <input type="checkbox" class="row-cb rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" ${isSelected?'checked':''} onchange="toggleRow(${i}, this)"/>
+      </td>
+      <td class="px-md py-sm">
+        <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span>
+      </td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
+      <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
+      <td class="px-md py-sm font-semibold text-body-md text-on-surface">${mat}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${ean}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${lote}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${exp}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
     </tr>`;
   }).join('');
 
   const total = rows.reduce((s, r) => s + getCantidad(r), 0);
-  document.getElementById('detalleCount').textContent = rows.length + ' registros';
+  document.getElementById('detalleCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
   document.getElementById('detalleTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
 }
 
