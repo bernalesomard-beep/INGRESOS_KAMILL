@@ -390,12 +390,25 @@
 const CSV_REGISTRO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
 const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
 
-// Fetch CSV con reintentos directos (Google Sheets pub CSV permite CORS desde navegador)
-async function fetchCSVDirect(url) {
-  const resp = await fetch(url, { cache: 'no-store' });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const text = await resp.text();
-  return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+// Fetch CSV — usa PapaParse download mode con proxy confiable
+function fetchCSVDirect(url) {
+  return new Promise((resolve, reject) => {
+    // corsproxy.io es el proxy más estable para GitHub Pages
+    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    Papa.parse(proxied, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: results => {
+        if (results.errors.length && !results.data.length) {
+          reject(results.errors[0]);
+        } else {
+          resolve(results.data);
+        }
+      },
+      error: err => reject(err)
+    });
+  });
 }
 
 // ========== STATE ==========
@@ -448,7 +461,7 @@ async function loadAllData() {
     console.error(e);
     document.getElementById('syncStatus').textContent = 'Error al cargar datos';
     document.getElementById('panelRecentTable').innerHTML =
-      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ No se pudo conectar a Google Sheets.<br>Asegúrate de que las hojas estén publicadas como CSV (Archivo → Compartir → Publicar en la web → CSV).</td></tr>';
+      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
   }
 }
 
@@ -522,10 +535,14 @@ function renderRegistro() {
   document.getElementById('registroHead').innerHTML = '<tr>' +
     keys.map(k => `<th class="px-lg py-lg font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${k.toUpperCase()}</th>`).join('') + '</tr>';
 
-  // Populate mes filter
-  const meses = [...new Set(registroData.map(r => getCol(r, ['mes','month'])).filter(Boolean))];
+  // Populate mes filter — busca columna que contenga 'mes' o 'month' en el sheet de registro
+  const mesKey = keys.find(k => k.toLowerCase().includes('mes') || k.toLowerCase().includes('month')) || '';
+  const meses = mesKey
+    ? [...new Set(registroData.map(r => (r[mesKey] || '').trim()).filter(Boolean))]
+    : [];
   const selReg = document.getElementById('registroMesFilter');
   selReg.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+  selReg.dataset.mesKey = mesKey;
 
   filterRegistro();
 }
@@ -533,15 +550,20 @@ function renderRegistro() {
 function filterRegistro() {
   const q = document.getElementById('registroSearch').value.toLowerCase();
   const mes = document.getElementById('registroMesFilter').value.toLowerCase();
+  const mesKey = document.getElementById('registroMesFilter').dataset.mesKey || '';
+
   registroFiltered = registroData.filter(r => {
-    const rowMes = getCol(r, ['mes','month']).toLowerCase();
-    if (mes && !rowMes.includes(mes)) return false;
+    if (mes && mesKey) {
+      const rowMes = (r[mesKey] || '').toLowerCase();
+      if (!rowMes.includes(mes)) return false;
+    }
     if (q) {
       const vals = Object.values(r).join(' ').toLowerCase();
       if (!vals.includes(q)) return false;
     }
     return true;
   });
+
   const keys = registroData.length ? Object.keys(registroData[0]) : [];
   const tbody = document.getElementById('registroBody');
   if (!registroFiltered.length) {
