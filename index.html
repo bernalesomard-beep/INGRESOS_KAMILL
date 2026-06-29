@@ -240,24 +240,6 @@
         </div>
       </section>
 
-      <!-- Top Materiales Chart -->
-      <section class="col-span-12 lg:col-span-6 bg-surface-container-lowest p-lg rounded-xl ghost-border">
-        <h4 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Top Materiales por Cantidad</h4>
-        <p class="text-body-sm text-on-surface-variant mb-lg">Materiales con mayor volumen de ingreso</p>
-        <div class="h-64">
-          <canvas id="topMaterialesChart"></canvas>
-        </div>
-      </section>
-
-      <!-- Ingresos por Mes (Barras) -->
-      <section class="col-span-12 lg:col-span-6 bg-surface-container-lowest p-lg rounded-xl ghost-border">
-        <h4 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Unidades por Mes</h4>
-        <p class="text-body-sm text-on-surface-variant mb-lg">Total de unidades ingresadas cada mes</p>
-        <div class="h-64">
-          <canvas id="unidadesBarChart"></canvas>
-        </div>
-      </section>
-
       <!-- Recent Detalle Table in Panel -->
       <section class="col-span-12 bg-surface-container-lowest rounded-xl ghost-border overflow-hidden">
         <div class="px-lg py-md border-b border-outline-variant flex justify-between items-center">
@@ -422,8 +404,6 @@ let detalleData = [];
 let registroFiltered = [];
 let detalleFiltered = [];
 let chartLine = null;
-let chartBar = null;
-let chartMateriales = null;
 
 // ========== NAV ==========
 function showSection(name) {
@@ -473,14 +453,55 @@ async function loadAllData() {
 }
 
 // ========== HELPERS ==========
-function getCol(row, candidates) {
+// Mapeo exacto de columnas del Sheet de Detalle:
+// REGISTRO → fecha/datetime  |  REFERENTE → OC  |  ORD → orden
+// DOCUMENTO → documento      |  MATERIAL NUMBER → material
+// ARTICLE DESCRIPTION → descripción  |  CANT. → cantidad
+// COD-EAN / EAN-CODE → ean  |  LOTE → lote  |  EXPIRA → vencimiento
+
+function colVal(row, names) {
+  // Exact match first, then includes
   for (const k of Object.keys(row)) {
-    const kl = k.toLowerCase().trim();
-    for (const c of candidates) {
-      if (kl.includes(c)) return row[k];
+    const kn = k.trim().toUpperCase();
+    for (const n of names) {
+      if (kn === n.toUpperCase()) return (row[k] || '').trim();
+    }
+  }
+  for (const k of Object.keys(row)) {
+    const kn = k.trim().toUpperCase();
+    for (const n of names) {
+      if (kn.includes(n.toUpperCase())) return (row[k] || '').trim();
     }
   }
   return '';
+}
+
+// Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS)
+function getMesFromRegistro(row) {
+  const reg = colVal(row, ['REGISTRO']);
+  if (!reg) return '';
+  // Try DD/MM/YYYY or YYYY-MM-DD
+  let d;
+  const parts = reg.split(/[\s\/\-:]/);
+  if (reg.includes('/')) {
+    // DD/MM/YYYY HH:MM:SS
+    d = new Date(+parts[2], +parts[1]-1, +parts[0]);
+  } else {
+    d = new Date(reg);
+  }
+  if (isNaN(d)) return '';
+  return MESES_ES[d.getMonth()];
+}
+
+function getMesIndexFromRow(row) {
+  return MESES_ES.indexOf(getMesFromRegistro(row));
+}
+
+function getCantidad(row) {
+  // Columna exacta: "CANT."
+  const v = colVal(row, ['CANT.', 'CANT', 'QUANTITY', 'CANTIDAD']);
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return isNaN(n) ? 0 : n;
 }
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -490,12 +511,6 @@ function getMesIndex(mesStr) {
   if (!mesStr) return -1;
   const m = mesStr.toLowerCase().trim();
   return MESES_ES.findIndex(me => me.startsWith(m.substring(0,3)));
-}
-
-function getCantidad(row) {
-  const v = getCol(row, ['cantidad','qty','units','unidades']);
-  const n = parseFloat(String(v).replace(/[^0-9.-]/g,''));
-  return isNaN(n) ? 0 : n;
 }
 
 // ========== RENDER REGISTRO ==========
@@ -545,10 +560,17 @@ function filterRegistro() {
 function renderDetalle() {
   if (!detalleData.length) return;
 
-  // Populate mes filter
-  const meses = [...new Set(detalleData.map(r => getCol(r, ['mes','month'])).filter(Boolean))];
+  // Populate mes filter — derived from REGISTRO date
+  const mesesSet = new Set();
+  detalleData.forEach(r => {
+    const m = getMesFromRegistro(r);
+    if (m) mesesSet.add(m);
+  });
+  // Sort by month order
+  const meses = MESES_ES.filter(m => mesesSet.has(m));
   const selDet = document.getElementById('detalleMesFilter');
-  selDet.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+  selDet.innerHTML = '<option value="">Todos</option>' + meses.map(m =>
+    `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
 
   filterDetalle();
 }
@@ -559,10 +581,10 @@ function filterDetalle() {
   const mt  = document.getElementById('detalleMtFilter').value.toLowerCase();
 
   detalleFiltered = detalleData.filter(r => {
-    const rowMes  = getCol(r, ['mes','month']).toLowerCase();
-    const rowDoc  = getCol(r, ['documento','doc','factura','fac']).toLowerCase();
-    const rowMat  = getCol(r, ['material','mat','codigo']).toLowerCase();
-    if (mes && !rowMes.includes(mes)) return false;
+    const rowMes = getMesFromRegistro(r).toLowerCase();
+    const rowDoc = colVal(r, ['DOCUMENTO']).toLowerCase();
+    const rowMat = colVal(r, ['MATERIAL NUMBER']).toLowerCase();
+    if (mes && rowMes !== mes) return false;
     if (doc && !rowDoc.includes(doc)) return false;
     if (mt  && !rowMat.includes(mt))  return false;
     return true;
@@ -580,18 +602,19 @@ function renderDetalleTable(rows) {
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const mes  = getCol(r, ['mes','month']);
-    const fec  = getCol(r, ['fecha','date']);
-    const oc   = getCol(r, ['oc','orden']);
-    const doc  = getCol(r, ['documento','doc','factura','fac']);
-    const mat  = getCol(r, ['material','mat','codigo']);
-    const desc = getCol(r, ['descripcion','description','desc']);
-    const ean  = getCol(r, ['ean','codigo barra','barcode']);
-    const lote = getCol(r, ['lote','lot','batch']);
-    const exp  = getCol(r, ['expir','venc','fecha venc']);
-    const qty  = getCol(r, ['cantidad','qty','units','unidades']);
+    const mes  = getMesFromRegistro(r);
+    const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '';
+    const fec  = colVal(r, ['REGISTRO']).split(' ')[0]; // solo fecha sin hora
+    const oc   = colVal(r, ['REFERENTE']);
+    const doc  = colVal(r, ['DOCUMENTO']);
+    const mat  = colVal(r, ['MATERIAL NUMBER']);
+    const desc = colVal(r, ['ARTICLE DESCRIPTION']);
+    const ean  = colVal(r, ['EAN-CODE', 'COD-EAN']);
+    const lote = colVal(r, ['LOTE']);
+    const exp  = colVal(r, ['EXPIRA']);
+    const qty  = colVal(r, ['CANT.', 'CANT']);
     return `<tr class="hover:bg-surface-container-high transition-colors">
-      <td class="px-lg py-lg text-on-surface-variant font-label-md">${mes}</td>
+      <td class="px-lg py-lg text-on-surface-variant font-label-md">${mesCap}</td>
       <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
       <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
       <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
@@ -612,15 +635,16 @@ function renderDetalleTable(rows) {
 // ========== RENDER PANEL (charts based on DETALLE) ==========
 function renderPanel() {
   // --- Monthly KPI from DETALLE ---
+  // Proveedores = valores únicos de DOCUMENTO por mes
+  // Unidades    = suma de CANT. por mes
   const byMes = {};
   MESES_ES.forEach((m, i) => { byMes[i] = { providers: new Set(), units: 0 }; });
 
   detalleData.forEach(r => {
-    const mes = getCol(r, ['mes','month']);
-    const idx = getMesIndex(mes);
+    const idx = getMesIndexFromRow(r);
     if (idx < 0) return;
-    const prv = getCol(r, ['proveedor','provider','supplier','oc','orden']);
-    if (prv) byMes[idx].providers.add(prv);
+    const doc = colVal(r, ['DOCUMENTO']);
+    if (doc) byMes[idx].providers.add(doc);
     byMes[idx].units += getCantidad(r);
   });
 
@@ -629,15 +653,16 @@ function renderPanel() {
   kpiGrid.innerHTML = MESES_ES.map((m, i) => {
     const d = byMes[i];
     const hasData = d.units > 0 || d.providers.size > 0;
+    const mCap = m.charAt(0).toUpperCase() + m.slice(1);
     return `<div class="bg-surface-container-lowest p-md rounded-xl ghost-border hover:shadow-md transition-all">
-      <p class="font-label-md text-label-md text-primary uppercase font-bold mb-xs">${m}</p>
+      <p class="font-label-md text-label-md text-primary uppercase font-bold mb-xs">${mCap}</p>
       <div class="space-y-base">
         <div class="flex items-center gap-xs">
-          <span class="material-symbols-outlined text-on-surface-variant" title="Proveedores">group</span>
+          <span class="material-symbols-outlined text-on-surface-variant" title="Documentos únicos">group</span>
           <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.providers.size : '—'}</p>
         </div>
         <div class="flex items-center gap-xs">
-          <span class="material-symbols-outlined text-on-surface-variant" title="Unidades">inventory_2</span>
+          <span class="material-symbols-outlined text-on-surface-variant" title="Unidades (CANT.)">inventory_2</span>
           <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.units.toLocaleString('es-PE') : '—'}</p>
         </div>
       </div>
@@ -700,68 +725,20 @@ function renderPanel() {
     }
   });
 
-  // --- Bar chart: Unidades por mes ---
-  const ctx2 = document.getElementById('unidadesBarChart').getContext('2d');
-  if (chartBar) chartBar.destroy();
-  chartBar = new Chart(ctx2, {
-    type: 'bar',
-    data: {
-      labels: MESES_SHORT,
-      datasets: [{ label: 'Unidades', data: unitsData, backgroundColor: '#005bbf', borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE') } } },
-      scales: {
-        y: { beginAtZero: true, grid:{color:'#ebeef4'}, ticks:{color:'#727785',font:{size:10},callback:v=>v>=1000?(v/1000)+'k':v} },
-        x: { grid:{display:false}, ticks:{color:'#727785',font:{size:10}} }
-      }
-    }
-  });
-
-  // --- Top Materiales bar chart ---
-  const matMap = {};
-  detalleData.forEach(r => {
-    const mat  = getCol(r, ['material','mat','codigo']) || 'Sin código';
-    const desc = getCol(r, ['descripcion','description','desc']) || mat;
-    const key  = mat;
-    if (!matMap[key]) matMap[key] = { label: mat + ' - ' + desc.substring(0,20), qty: 0 };
-    matMap[key].qty += getCantidad(r);
-  });
-  const sorted = Object.values(matMap).sort((a,b) => b.qty - a.qty).slice(0,10);
-
-  const ctx3 = document.getElementById('topMaterialesChart').getContext('2d');
-  if (chartMateriales) chartMateriales.destroy();
-  chartMateriales = new Chart(ctx3, {
-    type: 'bar',
-    data: {
-      labels: sorted.map(m => m.label),
-      datasets: [{ label: 'Cantidad', data: sorted.map(m => m.qty), backgroundColor: '#006d3a', borderRadius: 4 }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend:{display:false} },
-      scales: {
-        x: { beginAtZero:true, grid:{color:'#ebeef4'}, ticks:{color:'#727785',font:{size:10}} },
-        y: { grid:{display:false}, ticks:{color:'#414754',font:{size:11}} }
-      }
-    }
-  });
-
   // --- Recent table in panel (last 10 rows of detalle) ---
   const recent = [...detalleData].reverse().slice(0, 10);
   document.getElementById('panelRecentTable').innerHTML = recent.length ?
     recent.map(r => {
-      const mes  = getCol(r, ['mes','month']);
-      const fec  = getCol(r, ['fecha','date']);
-      const oc   = getCol(r, ['oc','orden']);
-      const doc  = getCol(r, ['documento','doc','factura','fac']);
-      const mat  = getCol(r, ['material','mat','codigo']);
-      const desc = getCol(r, ['descripcion','description','desc']);
-      const qty  = getCol(r, ['cantidad','qty','units','unidades']);
+      const mes  = getMesFromRegistro(r);
+      const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '';
+      const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
+      const oc   = colVal(r, ['REFERENTE']);
+      const doc  = colVal(r, ['DOCUMENTO']);
+      const mat  = colVal(r, ['MATERIAL NUMBER']);
+      const desc = colVal(r, ['ARTICLE DESCRIPTION']);
+      const qty  = colVal(r, ['CANT.', 'CANT']);
       return `<tr class="hover:bg-surface-container-high transition-colors">
-        <td class="px-lg py-lg text-on-surface-variant font-label-md">${mes}</td>
+        <td class="px-lg py-lg text-on-surface-variant font-label-md">${mesCap}</td>
         <td class="px-lg py-lg text-on-surface-variant font-mono-data">${fec}</td>
         <td class="px-lg py-lg text-primary font-mono-data font-bold">${oc}</td>
         <td class="px-lg py-lg text-on-surface-variant font-mono-data">${doc}</td>
