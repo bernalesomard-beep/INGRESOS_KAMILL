@@ -674,11 +674,14 @@
 const CSV_REGISTRO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
 const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
 
-// Fetch CSV — usa PapaParse download mode con proxy confiable
+// Fetch CSV — usa PapaParse download mode con proxy confiable + anti-caché
 function fetchCSVDirect(url) {
   return new Promise((resolve, reject) => {
-    // corsproxy.io es el proxy más estable para GitHub Pages
-    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    // Anti-caché: timestamp único en cada llamada para evitar respuestas viejas
+    // tanto de Google Sheets como del proxy CORS.
+    const bust = '&_=' + Date.now();
+    const urlFresh = url + bust;
+    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(urlFresh);
     Papa.parse(proxied, {
       download: true,
       header: true,
@@ -726,14 +729,14 @@ function handlePlantillaUpload(event) {
   reader.onload = e => {
     try {
       const data = new Uint8Array(e.target.result);
-      // type:'array' + cellText:true fuerza a leer el TEXTO TAL CUAL se ve en Excel,
-      // sin evaluar fórmulas ni interpretar "14-00000370" como una resta matemática.
-      const wb = XLSX.read(data, { type: 'array', cellDates: false, cellText: true, cellFormula: false });
+      // cellFormula:true permite recuperar el texto original si Excel evaluó "14-00000343" como fórmula de resta.
+      const wb = XLSX.read(data, { type: 'array', cellDates: false, cellText: true, cellFormula: true });
       const firstSheet = wb.SheetNames[0];
       const ws = wb.Sheets[firstSheet];
 
-      // Leer celda por celda usando el texto formateado (.w) cuando existe,
-      // que es el valor EXACTO mostrado en Excel (evita -356 en vez de 14-00000370)
+      // Leer celda por celda. Si Excel interpretó "14-00000343" como una FÓRMULA
+      // de resta, el código original sobrevive en cell.f (la fórmula). Lo recuperamos
+      // ahí; si no hay fórmula, usamos el texto formateado (.w) o el valor crudo (.v).
       const range = XLSX.utils.decode_range(ws['!ref']);
       const aoa = [];
       for (let r = range.s.r; r <= range.e.r; r++) {
@@ -742,8 +745,16 @@ function handlePlantillaUpload(event) {
           const addr = XLSX.utils.encode_cell({ r, c });
           const cell = ws[addr];
           if (!cell) { row.push(''); continue; }
-          // Prioridad: texto formateado (.w) > valor crudo (.v)
-          row.push(cell.w !== undefined ? cell.w : (cell.v !== undefined ? cell.v : ''));
+          let val;
+          if (cell.f && /^\d+-\d+$/.test(cell.f)) {
+            // Celda fue evaluada como resta (ej: 14-00000343 → -343). Recuperamos el texto original de la fórmula.
+            val = cell.f;
+          } else if (cell.w !== undefined) {
+            val = cell.w;
+          } else {
+            val = cell.v !== undefined ? cell.v : '';
+          }
+          row.push(val);
         }
         aoa.push(row);
       }
