@@ -1099,7 +1099,7 @@ function renderRegistro() {
   if (!registroData.length) return;
   // Columnas del Sheet que no se muestran en la tabla de Registro.
   // OJO: comparación EXACTA (no "includes") para no ocultar también "ESTATUS STOCK".
-  const HIDDEN_REGISTRO_COLS = ['REGISTRO','ESTATUS','CANT','UBIC DESTINO','USUARIO','NOM_USUARIO','EQUIPO','IMAGEN'];
+  const HIDDEN_REGISTRO_COLS = ['ID IMPOR','REGISTRO','ESTATUS','CANT','UBIC DESTINO','USUARIO','NOM_USUARIO','EQUIPO','IMAGEN','CUSTOMS CODE','LINEA','CONDICION'];
   registroKeys = Object.keys(registroData[0])
     .filter(k => !HIDDEN_REGISTRO_COLS.includes(k.trim().toUpperCase()));
 
