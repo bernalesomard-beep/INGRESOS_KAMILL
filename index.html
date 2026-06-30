@@ -407,7 +407,7 @@
           <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
           <button onclick="clearRegistroFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
         </div>
-        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-5 gap-md">
           <div>
             <label class="form-label">Mes</label>
             <select id="registroMesFilter" onchange="filterRegistro()" class="form-input">
@@ -421,6 +421,16 @@
           <div>
             <label class="form-label">Documento</label>
             <input id="registroDocFilter" oninput="filterRegistro()" class="form-input" placeholder="Buscar documento..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Estatus</label>
+            <select id="registroEstatusFilter" onchange="filterRegistro()" class="form-input">
+              <option value="">Todos los estatus</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Completado">Completado</option>
+              <option value="Error">Error</option>
+            </select>
           </div>
           <div>
             <label class="form-label">Búsqueda general</label>
@@ -978,7 +988,7 @@ async function loadAllData() {
       fetchSheetData('registro'),
       fetchSheetData('detalle')
     ]);
-    registroData = reg;
+    registroData = reg.map(r => ({ ...r, 'ESTATUS STOCK': calcEstatusStock(r) }));
     detalleData  = det;
     registroFiltered = [...reg];
     detalleFiltered  = [...det];
@@ -1005,6 +1015,26 @@ async function loadAllData() {
 // DOCUMENTO → documento      |  MATERIAL NUMBER → material
 // ARTICLE DESCRIPTION → descripción  |  CANT. → cantidad
 // COD-EAN / EAN-CODE → ean  |  LOTE → lote  |  EXPIRA → vencimiento
+
+// Calcula el estatus de la línea según STOCK vs QUANTITY.
+// Prioridad (de mayor a menor): Error > Completado > Pendiente > En proceso.
+// - STOCK < 0           -> "Error" (se descontó más de lo que había)
+// - STOCK == 0          -> "Completado"
+// - STOCK == QUANTITY   -> "Pendiente" (aún no se ha tocado el saldo)
+// - STOCK < QUANTITY     -> "En proceso"
+// - STOCK > QUANTITY     -> "Revisar" (caso no esperado, saldo mayor al original)
+function calcEstatusStock(row) {
+  const qtyRaw   = colVal(row, ['QUANTITY']);
+  const stockRaw = colVal(row, ['STOCK']);
+  const qty   = parseFloat(qtyRaw);
+  const stock = parseFloat(stockRaw);
+  if (isNaN(qty) || isNaN(stock)) return '';
+  if (stock < 0) return 'Error';
+  if (stock === 0) return 'Completado';
+  if (stock === qty) return 'Pendiente';
+  if (stock < qty) return 'En proceso';
+  return 'Revisar';
+}
 
 function colVal(row, names) {
   // Exact match first, then includes
@@ -1067,7 +1097,11 @@ let registroKeys = [];
 
 function renderRegistro() {
   if (!registroData.length) return;
-  registroKeys = Object.keys(registroData[0]);
+  // Columnas del Sheet que no se muestran en la tabla de Registro.
+  // OJO: comparación EXACTA (no "includes") para no ocultar también "ESTATUS STOCK".
+  const HIDDEN_REGISTRO_COLS = ['REGISTRO','ESTATUS','CANT','UBIC DESTINO','USUARIO','NOM_USUARIO','EQUIPO','IMAGEN'];
+  registroKeys = Object.keys(registroData[0])
+    .filter(k => !HIDDEN_REGISTRO_COLS.includes(k.trim().toUpperCase()));
 
   // Mes filter — busca columna MES
   const mesKey = registroKeys.find(k => k.trim().toUpperCase() === 'MES') ||
@@ -1081,7 +1115,7 @@ function renderRegistro() {
   selReg.dataset.mesKey = mesKey;
 
   // Build sortable header with checkbox
-  const sortableKeys = ['MES','TIPO','ORD','REFERENTE','INGRESO','DOCUMENTO','MATERIAL NUMBER','CANTIDAD','CANT.'];
+  const sortableKeys = ['MES','TIPO','ORD','REFERENTE','INGRESO','DOCUMENTO','MATERIAL NUMBER','CANTIDAD','CANT.','ESTATUS STOCK'];
   document.getElementById('registroHead').innerHTML = '<tr>' +
     `<th class="px-md py-md w-10"><input id="regCheckAll" type="checkbox" onchange="toggleAllRegistroRows(this)" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"/></th>` +
     registroKeys.map(k => {
@@ -1093,7 +1127,7 @@ function renderRegistro() {
 }
 
 function clearRegistroFilters() {
-  ['registroMesFilter','registroTipoFilter','registroDocFilter','registroSearch'].forEach(id => {
+  ['registroMesFilter','registroTipoFilter','registroDocFilter','registroEstatusFilter','registroSearch'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1105,9 +1139,11 @@ function filterRegistro() {
   const mes  = document.getElementById('registroMesFilter').value.toLowerCase();
   const tipo = (document.getElementById('registroTipoFilter')?.value || '').toLowerCase();
   const doc  = (document.getElementById('registroDocFilter')?.value  || '').toLowerCase();
+  const estatus = document.getElementById('registroEstatusFilter')?.value || '';
   const q    = document.getElementById('registroSearch').value.toLowerCase();
 
   registroFiltered = registroData.filter(r => {
+    if (estatus && r['ESTATUS STOCK'] !== estatus) return false;
     if (mes && mesKey) {
       if (!String(r[mesKey]||'').toLowerCase().includes(mes.substring(0,3))) return false;
     }
@@ -1228,6 +1264,17 @@ function renderRegistroTable(rows) {
     const cells = registroKeys.map(k => {
       const v = r[k] || '';
       const ku = k.trim().toUpperCase();
+      if (ku === 'ESTATUS STOCK') {
+        const estStyles = {
+          'PENDIENTE':  'bg-slate-100 text-slate-600',
+          'EN PROCESO': 'bg-amber-100 text-amber-700',
+          'COMPLETADO': 'bg-green-100 text-green-700',
+          'ERROR':      'bg-red-100 text-red-700',
+          'REVISAR':    'bg-purple-100 text-purple-700'
+        };
+        const cls = estStyles[String(v).toUpperCase()] || 'bg-gray-100 text-gray-600';
+        return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${v || '—'}</span></td>`;
+      }
       if (BADGE_COLS.some(b => ku.includes(b))) {
         const cap = String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase();
         return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${cap || '—'}</span></td>`;
