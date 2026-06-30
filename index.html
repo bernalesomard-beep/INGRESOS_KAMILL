@@ -671,31 +671,24 @@
 
 <script>
 // ========== CONFIG ==========
-const CSV_REGISTRO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
-const CSV_DETALLE  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
+// Antes se leía vía CSV publicado + corsproxy.io (frágil, se bloqueaba seguido).
+// Ahora Registro y Detalle se leen directo desde el mismo Apps Script que ya
+// usamos para guardar (APPS_SCRIPT_URL), con ?action=registro / ?action=detalle.
+// Ya no se usa corsproxy.io en ningún punto de la carga de datos.
 
-// Fetch CSV — usa PapaParse download mode con proxy confiable + anti-caché
-function fetchCSVDirect(url) {
-  return new Promise((resolve, reject) => {
-    // Anti-caché: timestamp único en cada llamada para evitar respuestas viejas
-    // tanto de Google Sheets como del proxy CORS.
-    const bust = '&_=' + Date.now();
-    const urlFresh = url + bust;
-    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(urlFresh);
-    Papa.parse(proxied, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: results => {
-        if (results.errors.length && !results.data.length) {
-          reject(results.errors[0]);
-        } else {
-          resolve(results.data);
-        }
-      },
-      error: err => reject(err)
+// Fetch de datos vía Apps Script (sin proxy externo, sin CORS)
+function fetchSheetData(action) {
+  const url = APPS_SCRIPT_URL + '?action=' + action + '&_=' + Date.now();
+  return fetch(url)
+    .then(resp => {
+      if (!resp.ok) throw new Error('Error de red (' + resp.status + ') al pedir ' + action);
+      return resp.json();
+    })
+    .then(data => {
+      if (data && !Array.isArray(data) && data.error) throw new Error(data.error);
+      if (!Array.isArray(data)) throw new Error('Respuesta inesperada del servidor para ' + action + '.');
+      return data;
     });
-  });
 }
 
 // ========== CARGA DE PLANTILLA (REGISTRO) ==========
@@ -715,7 +708,11 @@ function downloadPlantillaVacia() {
   // Fila de ejemplo para que el usuario vea el formato correcto (se puede borrar)
   const ejemplo = headers.map(h => {
     if (h === 'Material Number') return "14-00000343"; // ejemplo con guión, ya como texto
-    if (h === 'QUANTITY' || h === 'STOCK') return 0;
+    if (h === 'QUANTITY') return 0;
+    if (h === 'STOCK') return ''; // se autocompleta = QUANTITY, no llenar manualmente
+    if (h === 'TIPO') return 'CL'; // siempre CL, se fuerza igual aunque lo cambies
+    if (h === 'MES') return ''; // se calcula automático desde INGRESO, no llenar manualmente
+    if (h === 'INGRESO') return '20250115'; // formato yyyymmdd
     return '';
   });
 
@@ -725,7 +722,7 @@ function downloadPlantillaVacia() {
   // nunca interprete "14-00000343" como una fórmula de resta.
   const TEXT_FORMAT_COLS = [
     'Material Number','CODIGO','EAN 13','LOTE','ORD','REFERENTE',
-    'DOCUMENTO','Customs code','LINEA'
+    'DOCUMENTO','Customs code','LINEA','INGRESO'
   ];
   headers.forEach((h, ci) => {
     if (TEXT_FORMAT_COLS.includes(h)) {
@@ -744,11 +741,33 @@ function downloadPlantillaVacia() {
   XLSX.writeFile(wb, 'Plantilla_Registro.xlsx');
 
   setTimeout(() => {
-    alert('📋 Plantilla descargada.\n\nIMPORTANTE: la columna MATERIAL (F) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n\nPuedes borrar la fila de ejemplo antes de llenar tus datos.');
+    alert('📋 Plantilla descargada.\n\nIMPORTANTE:\n' +
+      '• La columna MATERIAL (F) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n' +
+      '• TIPO se guardará siempre como "CL", sin importar lo que escribas.\n' +
+      '• MES se calcula automáticamente a partir de INGRESO, no es necesario llenarlo.\n' +
+      '• INGRESO debe ir en formato AAAAMMDD (ej: 20250115), como texto.\n' +
+      '• STOCK se autocompleta siempre con el valor de QUANTITY, no es necesario llenarlo.\n\n' +
+      'Puedes borrar la fila de ejemplo antes de llenar tus datos.');
   }, 300);
 }
 
 let pendingPlantillaRows = [];
+
+// Nombres de mes en español (mismo orden que MESES_ES más abajo, duplicado aquí
+// porque se usa antes de que se declare esa constante en el archivo).
+const MESES_ES_PLANTILLA = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+// Convierte INGRESO en formato AAAAMMDD (ej: "20250115") al nombre del mes en español.
+// Acepta también AAAA-MM-DD o AAAA/MM/DD por si el Excel lo formatea distinto.
+function mesFromIngresoYYYYMMDD(ingresoVal) {
+  const raw = String(ingresoVal || '').trim();
+  if (!raw) return '';
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (digits.length < 8) return '';
+  const mm = parseInt(digits.substring(4, 6), 10);
+  if (mm < 1 || mm > 12) return '';
+  return MESES_ES_PLANTILLA[mm - 1];
+}
 
 function handlePlantillaUpload(event) {
   const file = event.target.files[0];
@@ -835,10 +854,15 @@ function handlePlantillaUpload(event) {
           // evitando que Excel/SheetJS lo interprete como número o notación científica.
           obj[col] = val;
         });
-        // QUANTITY autocompleta STOCK si STOCK viene vacío (no se llena manualmente)
-        if ((obj['STOCK'] === '' || obj['STOCK'] === undefined) && obj['QUANTITY'] !== '') {
-          obj['STOCK'] = obj['QUANTITY'];
-        }
+        // TIPO siempre "CL", sin importar lo que venga en el archivo
+        obj['TIPO'] = 'CL';
+
+        // MES se calcula SIEMPRE desde INGRESO (formato AAAAMMDD), se ignora lo que venga en el archivo
+        obj['MES'] = mesFromIngresoYYYYMMDD(obj['INGRESO']);
+
+        // STOCK siempre igual a QUANTITY (se ignora lo que venga en el archivo)
+        obj['STOCK'] = obj['QUANTITY'] !== '' ? obj['QUANTITY'] : '';
+
         // CONDICION 2 siempre LOTIZADO
         obj['CONDICION 2'] = 'LOTIZADO';
         return obj;
@@ -847,7 +871,11 @@ function handlePlantillaUpload(event) {
       // Mostrar modal de confirmación
       document.getElementById('plantillaModalText').innerHTML =
         `Se detectaron <strong>${pendingPlantillaRows.length}</strong> fila(s) en el archivo <strong>${file.name}</strong>.<br><br>
-        Se asignará un ID IMPOR correlativo automático y la columna CONDICION 2 se completará con <strong>"LOTIZADO"</strong>.<br><br>
+        Se asignará un ID IMPOR correlativo automático. Además:<br>
+        • TIPO se guardará como <strong>"CL"</strong><br>
+        • MES se calculará desde INGRESO (AAAAMMDD)<br>
+        • STOCK se igualará a QUANTITY<br>
+        • CONDICION 2 se completará con <strong>"LOTIZADO"</strong><br><br>
         Los datos se guardarán directamente en tu Google Sheet de Registro. ¿Deseas continuar?`;
       document.getElementById('plantillaModal').classList.remove('hidden');
 
@@ -947,8 +975,8 @@ async function loadAllData() {
   document.getElementById('syncStatus').textContent = 'Sincronizando...';
   try {
     const [reg, det] = await Promise.all([
-      fetchCSVDirect(CSV_REGISTRO),
-      fetchCSVDirect(CSV_DETALLE)
+      fetchSheetData('registro'),
+      fetchSheetData('detalle')
     ]);
     registroData = reg;
     detalleData  = det;
