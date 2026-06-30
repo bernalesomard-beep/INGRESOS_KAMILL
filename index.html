@@ -677,7 +677,9 @@ function handlePlantillaUpload(event) {
       const firstSheet = wb.SheetNames[0];
       const ws = wb.Sheets[firstSheet];
       // Leer como array de arrays para respetar las columnas A-T por posición
-      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      // Leer como array de arrays, forzando TODO como texto (raw:false + cellText)
+      // para que EAN, ORD, REFERENTE, etc. no se conviertan a notación científica
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
 
       if (!aoa.length) { alert('El archivo está vacío.'); return; }
 
@@ -686,13 +688,29 @@ function handlePlantillaUpload(event) {
 
       if (!dataRows.length) { alert('No se encontraron filas de datos en la plantilla.'); return; }
 
+      // Columnas que SÍ son numéricas — todo lo demás se fuerza a texto plano
+      const NUMERIC_PLANTILLA_COLS = ['QUANTITY', 'STOCK'];
+
       // Mapear columna B(index1) a T(index19) → PLANTILLA_COLS
       pendingPlantillaRows = dataRows.map(row => {
         const obj = {};
         PLANTILLA_COLS.forEach((col, i) => {
           // B=1, C=2 ... T=19 → offset +1 porque A=0 es ID IMPOR (se ignora del archivo)
-          obj[col] = row[i + 1] !== undefined ? String(row[i + 1]).trim() : '';
+          let raw = row[i + 1] !== undefined ? row[i + 1] : '';
+          let val = String(raw).trim();
+          if (NUMERIC_PLANTILLA_COLS.includes(col)) {
+            // Entero limpio: sin decimales ni separador de miles
+            const n = parseInt(val.replace(/[^0-9-]/g,''), 10);
+            val = isNaN(n) ? '' : n;
+          }
+          // Para todo lo demás (EAN, ORD, REFERENTE, DOCUMENTO, LOTE, etc.) se conserva como texto plano,
+          // evitando que Excel/SheetJS lo interprete como número o notación científica.
+          obj[col] = val;
         });
+        // QUANTITY autocompleta STOCK si STOCK viene vacío (no se llena manualmente)
+        if ((obj['STOCK'] === '' || obj['STOCK'] === undefined) && obj['QUANTITY'] !== '') {
+          obj['STOCK'] = obj['QUANTITY'];
+        }
         // CONDICION 2 siempre LOTIZADO
         obj['CONDICION 2'] = 'LOTIZADO';
         return obj;
@@ -737,10 +755,19 @@ async function confirmPlantillaUpload() {
   try {
     const resp = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' }, // evita preflight CORS
-      body: JSON.stringify({ rows: pendingPlantillaRows })
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ rows: pendingPlantillaRows }),
+      redirect: 'follow'
     });
-    const result = await resp.json();
+
+    if (!resp.ok) {
+      throw new Error('HTTP ' + resp.status);
+    }
+
+    const text = await resp.text();
+    let result;
+    try { result = JSON.parse(text); }
+    catch { throw new Error('Respuesta inválida del servidor: ' + text.substring(0,200)); }
 
     if (result.ok) {
       closePlantillaModal();
@@ -751,7 +778,11 @@ async function confirmPlantillaUpload() {
     }
   } catch (err) {
     console.error(err);
-    alert('❌ No se pudo guardar en Google Sheets: ' + err.message);
+    let msg = err.message;
+    if (msg.includes('Failed to fetch') || msg.includes('CORS')) {
+      msg = 'Bloqueo de CORS. Verifica que el Apps Script esté desplegado con acceso "Cualquier usuario" y que la implementación sea la más reciente (debes crear una NUEVA implementación cada vez que edites el script, no solo guardar).';
+    }
+    alert('❌ No se pudo guardar en Google Sheets:\n\n' + msg);
   } finally {
     btn.disabled = false; btn.innerHTML = originalText;
   }
@@ -1811,4 +1842,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
