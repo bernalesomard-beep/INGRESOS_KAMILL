@@ -175,10 +175,62 @@
         <span id="syncStatus" class="text-[11px] font-semibold text-on-secondary-container">Cargando...</span>
       </div>
       <div class="flex items-center gap-md">
-        <button class="p-base hover:bg-surface-container-high rounded-full transition-colors relative">
-          <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
-          <div class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full border-2 border-surface"></div>
-        </button>
+        <div class="relative">
+          <button id="notifBtn" onclick="toggleNotifPanel()" class="p-base hover:bg-surface-container-high rounded-full transition-colors relative">
+            <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+            <div id="notifDot" class="hidden absolute top-1 right-1 w-2 h-2 bg-error rounded-full border-2 border-surface"></div>
+          </button>
+
+          <!-- Notification Panel -->
+          <div id="notifPanel" class="hidden absolute right-0 top-12 w-[380px] bg-white rounded-xl border border-outline-variant shadow-xl z-[200] overflow-hidden">
+            <!-- Info de recepción -->
+            <div class="bg-gradient-to-br from-secondary to-secondary/80 px-lg py-md text-white">
+              <div class="flex items-center gap-sm mb-xs">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <h4 class="font-headline-sm text-headline-sm">1. Recepción de Mercadería</h4>
+              </div>
+            </div>
+            <div class="px-lg py-md space-y-sm border-b border-outline-variant">
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">schedule</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Horario</p>
+                  <p class="text-body-sm text-on-surface">L-V &nbsp;08:00 AM - 04:00 PM</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">inventory_2</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Condiciones</p>
+                  <p class="text-body-sm text-on-surface">Mercadería paletizada y segregada (a cargo de Kamill)</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">fact_check</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Proceso</p>
+                  <p class="text-body-sm text-on-surface">Revisión del 100% de unidades</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">assignment_return</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Devoluciones</p>
+                  <p class="text-body-sm text-on-surface">Lead time de hasta 72 horas</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alertas de stock pendiente -->
+            <div class="px-lg py-sm bg-surface-container-low/60 flex items-center gap-sm">
+              <span class="material-symbols-outlined text-error text-[16px]">warning</span>
+              <span class="font-label-md text-label-md text-on-surface-variant uppercase">OC con códigos pendientes de registrar</span>
+            </div>
+            <div id="notifPendingList" class="max-h-[220px] overflow-auto hide-scrollbar divide-y divide-outline-variant">
+              <div class="px-lg py-md text-center text-body-sm text-on-surface-variant">Cargando...</div>
+            </div>
+          </div>
+        </div>
         <button class="p-base hover:bg-surface-container-high rounded-full transition-colors">
           <span class="material-symbols-outlined text-on-surface-variant">help_outline</span>
         </button>
@@ -674,13 +726,27 @@ function handlePlantillaUpload(event) {
   reader.onload = e => {
     try {
       const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: 'array', cellDates: false });
+      // type:'array' + cellText:true fuerza a leer el TEXTO TAL CUAL se ve en Excel,
+      // sin evaluar fórmulas ni interpretar "14-00000370" como una resta matemática.
+      const wb = XLSX.read(data, { type: 'array', cellDates: false, cellText: true, cellFormula: false });
       const firstSheet = wb.SheetNames[0];
       const ws = wb.Sheets[firstSheet];
-      // Leer como array de arrays para respetar las columnas A-T por posición
-      // Leer como array de arrays, forzando TODO como texto (raw:false + cellText)
-      // para que EAN, ORD, REFERENTE, etc. no se conviertan a notación científica
-      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
+
+      // Leer celda por celda usando el texto formateado (.w) cuando existe,
+      // que es el valor EXACTO mostrado en Excel (evita -356 en vez de 14-00000370)
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const aoa = [];
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        const row = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[addr];
+          if (!cell) { row.push(''); continue; }
+          // Prioridad: texto formateado (.w) > valor crudo (.v)
+          row.push(cell.w !== undefined ? cell.w : (cell.v !== undefined ? cell.v : ''));
+        }
+        aoa.push(row);
+      }
 
       if (!aoa.length) { alert('El archivo está vacío.'); return; }
 
@@ -835,6 +901,7 @@ async function loadAllData() {
     renderDetalle();
     renderPanel();
     renderKPI();
+    renderNotifications();
   } catch(e) {
     console.error(e);
     document.getElementById('syncStatus').textContent = 'Error al cargar datos';
@@ -855,13 +922,13 @@ function colVal(row, names) {
   for (const k of Object.keys(row)) {
     const kn = k.trim().toUpperCase();
     for (const n of names) {
-      if (kn === n.toUpperCase()) return (row[k] || '').trim();
+      if (kn === n.toUpperCase()) return (row[k] || '').replace(/[\r\n]+/g, ' ').trim();
     }
   }
   for (const k of Object.keys(row)) {
     const kn = k.trim().toUpperCase();
     for (const n of names) {
-      if (kn.includes(n.toUpperCase())) return (row[k] || '').trim();
+      if (kn.includes(n.toUpperCase())) return (row[k] || '').replace(/[\r\n]+/g, ' ').trim();
     }
   }
   return '';
@@ -1271,7 +1338,7 @@ function renderDetalleTable(rows) {
       <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
       <td class="px-md py-sm text-on-surface text-[13px] max-w-[160px] truncate font-semibold" title="${prov}">${prov || '—'}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
-      <td class="px-md py-sm font-semibold text-body-md text-on-surface">${mat}</td>
+      <td class="px-md py-sm font-semibold text-body-md text-on-surface whitespace-nowrap">${mat}</td>
       <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${ean}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${lote}</td>
@@ -1591,7 +1658,65 @@ function download(name, content, type) {
   a.download = name; a.click();
 }
 
-// ========== KPI INGRESO ==========
+// ========== NOTIFICACIONES: OC con STOCK pendiente ==========
+function toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  panel.classList.toggle('hidden');
+}
+
+// Cerrar panel al hacer clic afuera
+document.addEventListener('click', e => {
+  const panel = document.getElementById('notifPanel');
+  const btn   = document.getElementById('notifBtn');
+  if (!panel || panel.classList.contains('hidden')) return;
+  if (!panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.add('hidden');
+  }
+});
+
+function renderNotifications() {
+  if (!registroData.length) return;
+
+  // Agrupar por ORD (OC) y sumar STOCK pendiente (valores > 0)
+  const groups = {};
+  registroData.forEach(r => {
+    const ord  = colVal(r, ['ORD']);
+    const doc  = colVal(r, ['DOCUMENTO']);
+    const prov = colVal(r, ['PROVEEDOR']);
+    const stockRaw = colVal(r, ['STOCK']);
+    const stock = parseFloat(String(stockRaw).replace(/[^0-9.-]/g,'')) || 0;
+    if (!ord) return;
+    if (!groups[ord]) groups[ord] = { ord, doc, prov, stockPendiente: 0, items: 0 };
+    groups[ord].stockPendiente += stock;
+    groups[ord].items += 1;
+  });
+
+  const pending = Object.values(groups).filter(g => g.stockPendiente > 0);
+
+  const list = document.getElementById('notifPendingList');
+  const dot  = document.getElementById('notifDot');
+
+  if (!pending.length) {
+    list.innerHTML = `<div class="px-lg py-md text-center text-body-sm text-secondary flex items-center justify-center gap-xs">
+      <span class="material-symbols-outlined text-[18px]">check_circle</span> Todo registrado, sin pendientes
+    </div>`;
+    dot.classList.add('hidden');
+    return;
+  }
+
+  dot.classList.remove('hidden');
+  list.innerHTML = pending.map(g => `
+    <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('registro'); document.getElementById('registroSearch').value='${g.ord}'; filterRegistro(); toggleNotifPanel();">
+      <div class="flex justify-between items-center">
+        <span class="font-mono-data text-[12px] font-bold text-primary">OC ${g.ord}</span>
+        <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">${g.stockPendiente.toLocaleString('es-PE')} pend.</span>
+      </div>
+      <p class="text-[11px] text-on-surface-variant truncate">${g.prov || g.doc || 'Sin proveedor'} · ${g.items} ítem(s)</p>
+    </div>
+  `).join('');
+}
+
+
 let kpiData     = [];
 let kpiFiltered = [];
 const selectedKPIRows = new Set();
