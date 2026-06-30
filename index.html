@@ -1011,13 +1011,13 @@ function colVal(row, names) {
   for (const k of Object.keys(row)) {
     const kn = k.trim().toUpperCase();
     for (const n of names) {
-      if (kn === n.toUpperCase()) return (row[k] || '').replace(/[\r\n]+/g, ' ').trim();
+      if (kn === n.toUpperCase()) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
     }
   }
   for (const k of Object.keys(row)) {
     const kn = k.trim().toUpperCase();
     for (const n of names) {
-      if (kn.includes(n.toUpperCase())) return (row[k] || '').replace(/[\r\n]+/g, ' ').trim();
+      if (kn.includes(n.toUpperCase())) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
     }
   }
   return '';
@@ -1073,7 +1073,7 @@ function renderRegistro() {
   const mesKey = registroKeys.find(k => k.trim().toUpperCase() === 'MES') ||
                  registroKeys.find(k => k.toLowerCase().includes('mes')) || '';
   const meses = mesKey
-    ? MESES_ES.filter(m => registroData.some(r => (r[mesKey]||'').toLowerCase().includes(m.substring(0,3))))
+    ? MESES_ES.filter(m => registroData.some(r => String(r[mesKey]||'').toLowerCase().includes(m.substring(0,3))))
     : [];
   const selReg = document.getElementById('registroMesFilter');
   selReg.innerHTML = '<option value="">Todos los meses</option>' +
@@ -1109,15 +1109,15 @@ function filterRegistro() {
 
   registroFiltered = registroData.filter(r => {
     if (mes && mesKey) {
-      if (!(r[mesKey]||'').toLowerCase().includes(mes.substring(0,3))) return false;
+      if (!String(r[mesKey]||'').toLowerCase().includes(mes.substring(0,3))) return false;
     }
     if (tipo) {
       const tipoKey = registroKeys.find(k => k.toLowerCase().includes('tipo')) || '';
-      if (tipoKey && !(r[tipoKey]||'').toLowerCase().includes(tipo)) return false;
+      if (tipoKey && !String(r[tipoKey]||'').toLowerCase().includes(tipo)) return false;
     }
     if (doc) {
       const docKey = registroKeys.find(k => k.toLowerCase().includes('documento') || k.toLowerCase().includes('doc')) || '';
-      if (docKey && !(r[docKey]||'').toLowerCase().includes(doc)) return false;
+      if (docKey && !String(r[docKey]||'').toLowerCase().includes(doc)) return false;
     }
     if (q) {
       if (!Object.values(r).join(' ').toLowerCase().includes(q)) return false;
