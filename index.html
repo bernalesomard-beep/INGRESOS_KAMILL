@@ -712,11 +712,40 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxix3lzRb_tq8qM
 
 function downloadPlantillaVacia() {
   const headers = ['ID IMPOR', ...PLANTILLA_COLS];
-  const ws = XLSX.utils.aoa_to_sheet([headers]);
-  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 14) }));
+  // Fila de ejemplo para que el usuario vea el formato correcto (se puede borrar)
+  const ejemplo = headers.map(h => {
+    if (h === 'Material Number') return "14-00000343"; // ejemplo con guión, ya como texto
+    if (h === 'QUANTITY' || h === 'STOCK') return 0;
+    return '';
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo]);
+
+  // Columnas que deben quedar formateadas como TEXTO de fábrica para que Excel
+  // nunca interprete "14-00000343" como una fórmula de resta.
+  const TEXT_FORMAT_COLS = [
+    'Material Number','CODIGO','EAN 13','LOTE','ORD','REFERENTE',
+    'DOCUMENTO','Customs code','LINEA'
+  ];
+  headers.forEach((h, ci) => {
+    if (TEXT_FORMAT_COLS.includes(h)) {
+      // Aplica formato de texto (@) a toda la columna, filas 2 a 200, para uso futuro del usuario
+      for (let ri = 1; ri <= 200; ri++) {
+        const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+        if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+        ws[addr].z = '@'; // formato número = texto
+      }
+    }
+  });
+
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
   XLSX.writeFile(wb, 'Plantilla_Registro.xlsx');
+
+  setTimeout(() => {
+    alert('📋 Plantilla descargada.\n\nIMPORTANTE: la columna MATERIAL (F) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n\nPuedes borrar la fila de ejemplo antes de llenar tus datos.');
+  }, 300);
 }
 
 let pendingPlantillaRows = [];
@@ -735,20 +764,30 @@ function handlePlantillaUpload(event) {
       const ws = wb.Sheets[firstSheet];
 
       // Leer celda por celda. Si Excel interpretó "14-00000343" como una FÓRMULA
-      // de resta, el código original sobrevive en cell.f (la fórmula). Lo recuperamos
-      // ahí; si no hay fórmula, usamos el texto formateado (.w) o el valor crudo (.v).
+      // de resta, el código original puede sobrevivir en cell.f (la fórmula).
       const range = XLSX.utils.decode_range(ws['!ref']);
       const aoa = [];
+      // Índice de columna F (MATERIAL) = 5 (A=0,B=1,C=2,D=3,E=4,F=5)
+      const MATERIAL_COL_INDEX = 5;
+      let materialCorrupted = false;
+
       for (let r = range.s.r; r <= range.e.r; r++) {
         const row = [];
         for (let c = range.s.c; c <= range.e.c; c++) {
           const addr = XLSX.utils.encode_cell({ r, c });
           const cell = ws[addr];
           if (!cell) { row.push(''); continue; }
+
           let val;
-          if (cell.f && /^\d+-\d+$/.test(cell.f)) {
-            // Celda fue evaluada como resta (ej: 14-00000343 → -343). Recuperamos el texto original de la fórmula.
+          if (cell.f) {
+            // Hay fórmula registrada: usar el texto de la fórmula tal cual (ej: "14-00000343")
             val = cell.f;
+          } else if (c === MATERIAL_COL_INDEX && r > 0 && cell.t === 'n') {
+            // Es la columna MATERIAL, viene como número puro SIN fórmula guardada
+            // (Excel ya aplanó "14-00000343" a su resultado y perdió el texto original).
+            // No hay forma de recuperar el dato — se marca para avisar al usuario.
+            materialCorrupted = true;
+            val = String(cell.v);
           } else if (cell.w !== undefined) {
             val = cell.w;
           } else {
@@ -760,6 +799,17 @@ function handlePlantillaUpload(event) {
       }
 
       if (!aoa.length) { alert('El archivo está vacío.'); return; }
+
+      if (materialCorrupted) {
+        alert('⚠️ ATENCIÓN: Excel convirtió algunos códigos de MATERIAL en números (ej: "14-00000343" se perdió y quedó como un número).\n\n' +
+          'Esto ocurre cuando la columna F (MATERIAL) no está formateada como TEXTO en tu Excel.\n\n' +
+          'Para solucionarlo de forma permanente:\n' +
+          '1. Selecciona toda la columna F en tu plantilla\n' +
+          '2. Clic derecho → Formato de celdas → Texto\n' +
+          '3. Vuelve a escribir o pegar los códigos de MATERIAL\n' +
+          '4. Guarda y vuelve a cargar el archivo\n\n' +
+          'Continuando con la carga, pero algunos materiales pueden salir incorrectos.');
+      }
 
       // Primera fila = encabezados de la plantilla (los ignoramos, usamos posición)
       const dataRows = aoa.slice(1).filter(row => row.some(cell => String(cell).trim() !== ''));
