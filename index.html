@@ -486,6 +486,7 @@
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('mes')">MES <span class="material-symbols-outlined text-[12px]" id="sort-mes">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('fecha')">FECHA <span class="material-symbols-outlined text-[12px]" id="sort-fecha">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('oc')">OC <span class="material-symbols-outlined text-[12px]" id="sort-oc">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
@@ -496,7 +497,7 @@
               </tr>
             </thead>
             <tbody id="detalleBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1240,7 +1241,7 @@ function sortDetalle(col) {
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
@@ -1250,6 +1251,7 @@ function renderDetalleTable(rows) {
     const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
     const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
     const oc   = colVal(r, ['REFERENTE']);
+    const prov = colVal(r, ['PROVEEDOR']);
     const doc  = colVal(r, ['DOCUMENTO']);
     const mat  = colVal(r, ['MATERIAL NUMBER']);
     const desc = colVal(r, ['ARTICLE DESCRIPTION']);
@@ -1267,6 +1269,7 @@ function renderDetalleTable(rows) {
       </td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
       <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[160px] truncate font-semibold" title="${prov}">${prov || '—'}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
       <td class="px-md py-sm font-semibold text-body-md text-on-surface">${mat}</td>
       <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
@@ -1538,6 +1541,7 @@ function exportDetalle() {
     'MES':         getMesFromRegistro(r),
     'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
     'OC':          colVal(r, ['REFERENTE']),
+    'PROVEEDOR':   colVal(r, ['PROVEEDOR']),
     'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
     'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
     'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
@@ -1554,6 +1558,7 @@ function exportSelected() {
     'MES':         getMesFromRegistro(r),
     'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
     'OC':          colVal(r, ['REFERENTE']),
+    'PROVEEDOR':   colVal(r, ['PROVEEDOR']),
     'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
     'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
     'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
