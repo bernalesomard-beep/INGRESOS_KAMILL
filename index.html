@@ -763,8 +763,10 @@
               <span class="text-body-sm font-semibold">Unidades</span>
             </div>
           </div>
-          <div class="h-72 w-full px-md">
-            <canvas id="horizonteChart"></canvas>
+          <div class="h-72 w-full overflow-x-auto hide-scrollbar">
+            <div id="horizonteChartInner" class="h-full" style="min-width:100%;">
+              <canvas id="horizonteChart"></canvas>
+            </div>
           </div>
         </section>
       </div>
@@ -2459,22 +2461,31 @@ function renderHorizonteTable(rows) {
 }
 
 function renderHorizonteChart(rows) {
-  const porDia = {};
-  rows.forEach(r => {
-    const key = r.fecha || '—';
-    if (!porDia[key]) porDia[key] = { fechaObj: r.fechaObj, unidades: 0 };
-    porDia[key].unidades += r.unidades;
+  // Una barra por cada registro (fecha + proveedor), ordenado por fecha y hora.
+  const ordenadas = [...rows].sort((a, b) => {
+    const diff = (a.fechaObj || 0) - (b.fechaObj || 0);
+    if (diff !== 0) return diff;
+    return (a.hora || '').localeCompare(b.hora || '');
   });
 
-  const dias = Object.keys(porDia).sort((a, b) => porDia[a].fechaObj - porDia[b].fechaObj);
-  const labels = dias.map(d => {
-    const fo = porDia[d].fechaObj;
-    return fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : d;
+  const labels = ordenadas.map(r => {
+    const fo = r.fechaObj;
+    const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : r.fecha;
+    // Etiqueta de 2 líneas: fecha+hora arriba, proveedor abajo
+    return [`${fechaCorta} ${r.hora || ''}`.trim(), r.proveedor || '—'];
   });
-  const data = dias.map(d => porDia[d].unidades);
+  const data = ordenadas.map(r => r.unidades);
 
   const canvas = document.getElementById('horizonteChart');
+  const inner  = document.getElementById('horizonteChartInner');
   if (!canvas) return;
+
+  // Ancho dinámico: ~90px por barra, para que no se amontonen los proveedores
+  if (inner) {
+    const minWidthPx = Math.max(ordenadas.length * 90, 100);
+    inner.style.minWidth = ordenadas.length > 8 ? minWidthPx + 'px' : '100%';
+  }
+
   const ctx = canvas.getContext('2d');
   if (chartHorizonte) chartHorizonte.destroy();
   chartHorizonte = new Chart(ctx, {
@@ -2486,7 +2497,7 @@ function renderHorizonteChart(rows) {
         data,
         backgroundColor: '#fdbc13',
         borderRadius: 4,
-        maxBarThickness: 48
+        maxBarThickness: 60
       }]
     },
     options: {
@@ -2496,7 +2507,10 @@ function renderHorizonteChart(rows) {
         tooltip: {
           backgroundColor: '#181c20',
           titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' }, padding: 12,
-          callbacks: { label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE') }
+          callbacks: {
+            title: items => items[0].label, // ya viene como array (2 líneas)
+            label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE')
+          }
         }
       },
       scales: {
@@ -2505,7 +2519,10 @@ function renderHorizonteChart(rows) {
           grid: { color: '#ebeef4', drawBorder: false },
           ticks: { color: '#727785', font: { family: 'JetBrains Mono', size: 10 } }
         },
-        x: { grid: { display: false }, ticks: { color: '#727785', font: { family: 'Inter', weight: '600', size: 10 } } }
+        x: {
+          grid: { display: false },
+          ticks: { color: '#727785', font: { family: 'Inter', weight: '600', size: 10 }, autoSkip: false, maxRotation: 0, minRotation: 0 }
+        }
       }
     }
   });
