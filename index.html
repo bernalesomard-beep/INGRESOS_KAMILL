@@ -2232,6 +2232,7 @@ let horizonteSortCol = 'fecha';
 let horizonteSortDir = 1;
 let chartHorizonte = null;
 let horizonteCalMonth = new Date(); // mes actualmente mostrado en el calendario visual
+let horizonteFirstLoad = true; // controla si se aplica el rango de "esta semana" por defecto
 
 function dateToInputStr(d) {
   const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
@@ -2272,13 +2273,14 @@ function loadHorizonte() {
         };
       }).filter(r => r.fechaObj); // solo filas con fecha válida
 
-      // Ubicar el calendario en el mes de la fecha más próxima disponible
-      if (horizonteData.length) {
-        const minFecha = horizonteData.reduce((min, r) => r.fechaObj < min ? r.fechaObj : min, horizonteData[0].fechaObj);
-        horizonteCalMonth = new Date(minFecha.getFullYear(), minFecha.getMonth(), 1);
+      if (horizonteFirstLoad) {
+        // Primera carga: por defecto se muestra el rango de esta semana (Lun-Dom)
+        horizonteFirstLoad = false;
+        setHorizontePreset('semana');
+      } else {
+        // Actualizaciones posteriores respetan los filtros que el usuario ya tenga puestos
+        filterHorizonte();
       }
-
-      filterHorizonte();
     },
     error: function(err) {
       console.error(err);
@@ -2311,10 +2313,10 @@ function setHorizontePreset(kind) {
 }
 
 function clearHorizonteFilters() {
-  document.getElementById('horDesde').value = '';
-  document.getElementById('horHasta').value = '';
+  // "Limpiar filtros" vuelve al rango de seguimiento semanal (Lun-Dom de esta semana),
+  // no a "todo": el filtro de fechas libre se reserva para consultas puntuales.
   document.getElementById('horProveedor').value = '';
-  filterHorizonte();
+  setHorizontePreset('semana');
 }
 
 function sortHorizonte(col) {
@@ -2460,46 +2462,70 @@ function renderHorizonteTable(rows) {
   document.getElementById('horizonteTotal').textContent = 'Total Unidades: ' + totalUnidades.toLocaleString('es-PE') + ' uds.';
 }
 
+// Paleta de 10 tonos (todos dentro de la familia del dorado/ámbar),
+// suficiente para hasta 10 proveedores por día.
+const HORIZONTE_PALETTE = [
+  '#fff3bf', '#ffe066', '#ffd43b', '#fcc419', '#fab005',
+  '#f59f00', '#e8a33d', '#d9822b', '#c76e00', '#a35700'
+];
+
 function renderHorizonteChart(rows) {
-  // Una barra por cada registro (fecha + proveedor), ordenado por fecha y hora.
-  const ordenadas = [...rows].sort((a, b) => {
-    const diff = (a.fechaObj || 0) - (b.fechaObj || 0);
-    if (diff !== 0) return diff;
-    return (a.hora || '').localeCompare(b.hora || '');
+  // Agrupar por fecha; dentro de cada fecha, ordenar por hora
+  const porFecha = {};
+  rows.forEach(r => {
+    const key = r.fecha || '—';
+    if (!porFecha[key]) porFecha[key] = { fechaObj: r.fechaObj, items: [] };
+    porFecha[key].items.push(r);
   });
 
-  const labels = ordenadas.map(r => {
-    const fo = r.fechaObj;
-    const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : r.fecha;
-    // Etiqueta de 2 líneas: fecha+hora arriba, proveedor abajo
-    return [`${fechaCorta} ${r.hora || ''}`.trim(), r.proveedor || '—'];
+  const fechas = Object.keys(porFecha).sort((a, b) => porFecha[a].fechaObj - porFecha[b].fechaObj);
+  fechas.forEach(f => porFecha[f].items.sort((a, b) => (a.hora || '').localeCompare(b.hora || '')));
+
+  const maxProveedores = fechas.length
+    ? Math.min(10, Math.max(...fechas.map(f => porFecha[f].items.length)))
+    : 0;
+
+  // Etiqueta de 2 líneas: fecha arriba, cantidad de proveedores abajo
+  const labels = fechas.map(f => {
+    const fo = porFecha[f].fechaObj;
+    const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : f;
+    const n = porFecha[f].items.length;
+    return [fechaCorta, `${n} proveedor${n !== 1 ? 'es' : ''}`];
   });
-  const data = ordenadas.map(r => r.unidades);
+
+  // Un dataset por "posición" de proveedor dentro del día (1er proveedor, 2do, ...),
+  // cada uno con un tono distinto de la paleta dorada.
+  const datasets = [];
+  for (let i = 0; i < maxProveedores; i++) {
+    datasets.push({
+      label: 'Proveedor ' + (i + 1),
+      data: fechas.map(f => {
+        const item = porFecha[f].items[i];
+        return item ? item.unidades : null;
+      }),
+      _meta: fechas.map(f => porFecha[f].items[i] || null),
+      backgroundColor: HORIZONTE_PALETTE[i % HORIZONTE_PALETTE.length],
+      borderRadius: 4,
+      maxBarThickness: 36
+    });
+  }
 
   const canvas = document.getElementById('horizonteChart');
   const inner  = document.getElementById('horizonteChartInner');
   if (!canvas) return;
 
-  // Ancho dinámico: ~90px por barra, para que no se amontonen los proveedores
+  // Ancho dinámico según cantidad de fechas y proveedores por día
   if (inner) {
-    const minWidthPx = Math.max(ordenadas.length * 90, 100);
-    inner.style.minWidth = ordenadas.length > 8 ? minWidthPx + 'px' : '100%';
+    const anchoPorFecha = Math.max(maxProveedores * 26, 70);
+    const minWidthPx = Math.max(fechas.length * anchoPorFecha, 100);
+    inner.style.minWidth = fechas.length > 6 ? minWidthPx + 'px' : '100%';
   }
 
   const ctx = canvas.getContext('2d');
   if (chartHorizonte) chartHorizonte.destroy();
   chartHorizonte = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Unidades',
-        data,
-        backgroundColor: '#fdbc13',
-        borderRadius: 4,
-        maxBarThickness: 60
-      }]
-    },
+    data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
@@ -2508,8 +2534,17 @@ function renderHorizonteChart(rows) {
           backgroundColor: '#181c20',
           titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' }, padding: 12,
           callbacks: {
-            title: items => items[0].label, // ya viene como array (2 líneas)
-            label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE')
+            title: items => {
+              const it = items[0];
+              const meta = it.dataset._meta ? it.dataset._meta[it.dataIndex] : null;
+              if (!meta) return '';
+              return `${meta.hora || ''}, ${meta.proveedor || ''}`.trim();
+            },
+            label: ctx => {
+              const meta = ctx.dataset._meta ? ctx.dataset._meta[ctx.dataIndex] : null;
+              const val = meta ? meta.unidades : ctx.parsed.y;
+              return 'Unidades: ' + (val ?? 0).toLocaleString('es-PE');
+            }
           }
         }
       },
