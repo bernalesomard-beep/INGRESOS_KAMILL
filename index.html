@@ -147,6 +147,10 @@
       <span class="material-symbols-outlined">bar_chart_4_bars</span>
       <span class="font-label-md text-label-md">KPI Ingreso</span>
     </div>
+    <div class="nav-item" onclick="showSection('horizonte')">
+      <span class="material-symbols-outlined">calendar_month</span>
+      <span class="font-label-md text-label-md">Horizonte</span>
+    </div>
   </nav>
   <div class="mt-auto pt-lg">
     <div class="mt-lg flex items-center gap-md p-sm bg-surface-container-lowest rounded-xl ghost-border">
@@ -671,6 +675,122 @@
         <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
           <span id="kpiCount" class="text-body-sm text-on-surface-variant">—</span>
           <span id="kpiTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== HORIZONTE SECTION ===== -->
+  <div id="section-horizonte" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Horizonte</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Próximas llegadas — fuente: Google Sheets (CSV público)</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadHorizonte()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportHorizonte()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm flex-wrap">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <div class="flex gap-xs ml-md flex-wrap">
+            <button onclick="setHorizontePreset('hoy')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Hoy</button>
+            <button onclick="setHorizontePreset('semana')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Esta semana</button>
+            <button onclick="setHorizontePreset('mes')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Este mes</button>
+            <button onclick="setHorizontePreset('todo')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Todo</button>
+          </div>
+          <button onclick="clearHorizonteFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Desde</label>
+            <input id="horDesde" type="date" onchange="filterHorizonte()" class="form-input"/>
+          </div>
+          <div>
+            <label class="form-label">Hasta</label>
+            <input id="horHasta" type="date" onchange="filterHorizonte()" class="form-input"/>
+          </div>
+          <div class="md:col-span-2">
+            <label class="form-label">Proveedor / Cliente</label>
+            <input id="horProveedor" oninput="filterHorizonte()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendario + Chart -->
+      <div class="grid grid-cols-12 gap-grid-gutter mb-md">
+        <!-- Calendario visual -->
+        <section class="col-span-12 lg:col-span-4 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+          <div class="flex items-center justify-between mb-md">
+            <button onclick="shiftHorizonteMonth(-1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span id="horCalLabel" class="font-headline-sm text-headline-sm text-on-surface">—</span>
+            <button onclick="shiftHorizonteMonth(1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-on-surface-variant uppercase mb-xs">
+            <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+          </div>
+          <div id="horCalGrid" class="grid grid-cols-7 gap-1"></div>
+          <div class="flex items-center gap-md mt-md text-[11px] text-on-surface-variant">
+            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded" style="background:#fdbc13"></div> En rango</div>
+            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded bg-surface-container-high"></div> Fuera de rango</div>
+          </div>
+        </section>
+
+        <!-- Chart -->
+        <section class="col-span-12 lg:col-span-8 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+          <div class="flex justify-between items-center mb-md">
+            <div>
+              <h4 class="font-headline-sm text-headline-sm text-on-surface">Unidades por día</h4>
+              <p class="text-body-sm text-on-surface-variant">Según el rango filtrado</p>
+            </div>
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full" style="background:#fdbc13"></div>
+              <span class="text-body-sm font-semibold">Unidades</span>
+            </div>
+          </div>
+          <div class="h-72 w-full px-md">
+            <canvas id="horizonteChart"></canvas>
+          </div>
+        </section>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[520px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('fecha')">Fecha de Llegada <span id="hsort-fecha" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('proveedor')">Proveedor / Cliente <span id="hsort-proveedor" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('oc')">OC <span id="hsort-oc" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('hora')">Hora <span id="hsort-hora" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('codigos')">Códigos <span id="hsort-codigos" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('unidades')">Unidades <span id="hsort-unidades" class="text-primary"></span></th>
+              </tr>
+            </thead>
+            <tbody id="horizonteBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="horizonteCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="horizonteTotal" class="text-body-sm font-bold text-primary">—</span>
         </div>
       </div>
     </section>
@@ -1654,7 +1774,8 @@ const FORCE_TEXT_COLS = ['ID','EAN','LOTE','COD','CODE','CODIGO','BARCODE',
   'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL NUMBER','REFERENTE','DOCUMENTO',
   'ORD','REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES','PROVEEDOR',
   'FECHA','MES','MES - AÑO','FECHA DE RECEPCIÓN','FECHA DE EMISIÓN NI',
-  'FECHA RECEPCIÓN','FECHA EMISIÓN','FECHA DE EJECUCIÓN','FECHA EJECUCION'];
+  'FECHA RECEPCIÓN','FECHA EMISIÓN','FECHA DE EJECUCIÓN','FECHA EJECUCION',
+  'HORA','OC'];
 
 function colIsText(colName) {
   const cu = colName.trim().toUpperCase();
@@ -2098,12 +2219,320 @@ function exportKPISelected() {
 }
 
 
+// ========== HORIZONTE (CSV público de Google Sheets) ==========
+// Fuente: hoja publicada como CSV. Columnas esperadas:
+// FECHA DE LLEGADA | PROVEEDOR | OC | HORA | CODIGOS | UNIDADES
+const HORIZONTE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQgn1Yp4-QseqM82ZqboVRImdNiFIx5kJLfO8ALa5nml7yqKSi9-HCWygRTHW932b7m06Jq2bG09QJA/pub?gid=1261767277&single=true&output=csv';
+
+let horizonteData = [];
+let horizonteFiltered = [];
+let horizonteSortCol = 'fecha';
+let horizonteSortDir = 1;
+let chartHorizonte = null;
+let horizonteCalMonth = new Date(); // mes actualmente mostrado en el calendario visual
+
+function dateToInputStr(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseFechaDDMMYYYY(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const parts = s.split('/');
+  if (parts.length !== 3) return null;
+  const d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function loadHorizonte() {
+  const tbody = document.getElementById('horizonteBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>';
+
+  Papa.parse(HORIZONTE_CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      horizonteData = (results.data || []).map(raw => {
+        const row = {};
+        Object.keys(raw).forEach(k => { row[k.trim().toUpperCase()] = raw[k]; });
+        const fechaStr = (row['FECHA DE LLEGADA'] || '').toString().trim();
+        const fechaObj = parseFechaDDMMYYYY(fechaStr);
+        return {
+          fecha:     fechaStr,
+          fechaObj:  fechaObj,
+          proveedor: (row['PROVEEDOR'] || '').toString().trim(),
+          oc:        (row['OC'] || '').toString().trim(),
+          hora:      (row['HORA'] || '').toString().trim(),
+          codigos:   parseFloat(String(row['CODIGOS']  || '').replace(/[^0-9.-]/g, '')) || 0,
+          unidades:  parseFloat(String(row['UNIDADES'] || '').replace(/[^0-9.-]/g, '')) || 0,
+        };
+      }).filter(r => r.fechaObj); // solo filas con fecha válida
+
+      // Ubicar el calendario en el mes de la fecha más próxima disponible
+      if (horizonteData.length) {
+        const minFecha = horizonteData.reduce((min, r) => r.fechaObj < min ? r.fechaObj : min, horizonteData[0].fechaObj);
+        horizonteCalMonth = new Date(minFecha.getFullYear(), minFecha.getMonth(), 1);
+      }
+
+      filterHorizonte();
+    },
+    error: function(err) {
+      console.error(err);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-error">⚠️ Error al cargar Horizonte. Verifica que la hoja esté publicada como CSV.</td></tr>';
+    }
+  });
+}
+
+function setHorizontePreset(kind) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const toInput = dateToInputStr;
+  let desde = '', hasta = '';
+  if (kind === 'hoy') {
+    desde = toInput(hoy); hasta = toInput(hoy);
+  } else if (kind === 'semana') {
+    const dow = hoy.getDay() === 0 ? 7 : hoy.getDay(); // Lunes=1 ... Domingo=7
+    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (dow - 1));
+    const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
+    desde = toInput(lunes); hasta = toInput(domingo);
+  } else if (kind === 'mes') {
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const ultimo  = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    desde = toInput(primero); hasta = toInput(ultimo);
+  } else {
+    desde = ''; hasta = '';
+  }
+  document.getElementById('horDesde').value = desde;
+  document.getElementById('horHasta').value = hasta;
+  filterHorizonte();
+}
+
+function clearHorizonteFilters() {
+  document.getElementById('horDesde').value = '';
+  document.getElementById('horHasta').value = '';
+  document.getElementById('horProveedor').value = '';
+  filterHorizonte();
+}
+
+function sortHorizonte(col) {
+  if (horizonteSortCol === col) horizonteSortDir *= -1;
+  else { horizonteSortCol = col; horizonteSortDir = 1; }
+  filterHorizonte();
+}
+
+function filterHorizonte() {
+  const desdeStr = document.getElementById('horDesde')?.value || '';
+  const hastaStr = document.getElementById('horHasta')?.value || '';
+  const prov = (document.getElementById('horProveedor')?.value || '').toLowerCase();
+
+  const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null;
+  const hasta = hastaStr ? new Date(hastaStr + 'T23:59:59') : null;
+
+  let rows = horizonteData.filter(r => {
+    if (desde && r.fechaObj < desde) return false;
+    if (hasta && r.fechaObj > hasta) return false;
+    if (prov && !r.proveedor.toLowerCase().includes(prov)) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let va, vb;
+    if (horizonteSortCol === 'fecha') { va = a.fechaObj; vb = b.fechaObj; }
+    else { va = a[horizonteSortCol]; vb = b[horizonteSortCol]; }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return -1 * horizonteSortDir;
+    if (va > vb) return  1 * horizonteSortDir;
+    return 0;
+  });
+
+  horizonteFiltered = rows;
+
+  // Actualizar flechas de orden en encabezados
+  ['fecha','proveedor','oc','hora','codigos','unidades'].forEach(c => {
+    const el = document.getElementById('hsort-' + c);
+    if (el) el.textContent = (c === horizonteSortCol) ? (horizonteSortDir === 1 ? '▲' : '▼') : '';
+  });
+
+  renderHorizonteTable(rows);
+  renderHorizonteChart(rows);
+  renderHorizonteCalendar();
+}
+
+function shiftHorizonteMonth(delta) {
+  horizonteCalMonth = new Date(horizonteCalMonth.getFullYear(), horizonteCalMonth.getMonth() + delta, 1);
+  renderHorizonteCalendar();
+}
+
+function selectHorizonteDay(iso) {
+  document.getElementById('horDesde').value = iso;
+  document.getElementById('horHasta').value = iso;
+  filterHorizonte();
+}
+
+function renderHorizonteCalendar() {
+  const label = document.getElementById('horCalLabel');
+  const grid  = document.getElementById('horCalGrid');
+  if (!label || !grid) return;
+
+  const year  = horizonteCalMonth.getFullYear();
+  const month = horizonteCalMonth.getMonth();
+  const mesCap = MESES_ES[month].charAt(0).toUpperCase() + MESES_ES[month].slice(1);
+  label.textContent = mesCap + ' ' + year;
+
+  // Suma de unidades por día (del dataset completo, no solo lo filtrado, para ver todo el mes)
+  const byDate = {};
+  horizonteData.forEach(r => {
+    if (r.fechaObj && r.fechaObj.getFullYear() === year && r.fechaObj.getMonth() === month) {
+      const key = r.fechaObj.getDate();
+      byDate[key] = (byDate[key] || 0) + r.unidades;
+    }
+  });
+
+  const desdeStr = document.getElementById('horDesde')?.value || '';
+  const hastaStr = document.getElementById('horHasta')?.value || '';
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7; // 0 = Lunes
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const hoyIso = dateToInputStr(new Date());
+
+  let cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push('<div></div>');
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(year, month, d);
+    const iso = dateToInputStr(dateObj);
+    const unidades = byDate[d];
+    const hasData = unidades != null;
+
+    let inRange = true;
+    if (desdeStr && iso < desdeStr) inRange = false;
+    if (hastaStr && iso > hastaStr) inRange = false;
+
+    const classes = ['rounded-lg','py-xs','text-[12px]','cursor-pointer','transition-all',
+      'flex','flex-col','items-center','justify-center','h-12','relative'];
+
+    if (hasData && inRange)      classes.push('font-bold text-on-tertiary-fixed-variant');
+    else if (hasData)            classes.push('bg-surface-container-high text-on-surface-variant font-semibold hover:bg-secondary-container/40');
+    else                          classes.push('text-on-surface-variant/50 hover:bg-surface-container-high');
+
+    if (iso === hoyIso) classes.push('ring-2 ring-primary ring-offset-1');
+
+    const style = (hasData && inRange) ? 'style="background:#fdbc13"' : '';
+    const unidadesLabel = hasData
+      ? (unidades >= 1000 ? (unidades/1000).toFixed(1) + 'k' : unidades.toLocaleString('es-PE'))
+      : '';
+
+    cells.push(`<div class="${classes.join(' ')}" ${style} onclick="selectHorizonteDay('${iso}')" title="${hasData ? unidades.toLocaleString('es-PE') + ' unidades' : 'Sin llegadas'}">
+      <span>${d}</span>
+      ${hasData ? `<span class="text-[9px] leading-none mt-0.5">${unidadesLabel}</span>` : ''}
+    </div>`);
+  }
+
+  grid.innerHTML = cells.join('');
+}
+
+function renderHorizonteTable(rows) {
+  const tbody = document.getElementById('horizonteBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('horizonteCount').textContent = '0 registros';
+    document.getElementById('horizonteTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm font-mono-data text-[12px] text-on-surface font-semibold whitespace-nowrap">${r.fecha || '—'}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[220px] truncate" title="${r.proveedor}">${r.proveedor || '—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${r.oc || '—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${r.hora || '—'}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.codigos.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.unidades.toLocaleString('es-PE')}</td>
+    </tr>
+  `).join('');
+
+  const totalUnidades = rows.reduce((s, r) => s + r.unidades, 0);
+  document.getElementById('horizonteCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('horizonteTotal').textContent = 'Total Unidades: ' + totalUnidades.toLocaleString('es-PE') + ' uds.';
+}
+
+function renderHorizonteChart(rows) {
+  const porDia = {};
+  rows.forEach(r => {
+    const key = r.fecha || '—';
+    if (!porDia[key]) porDia[key] = { fechaObj: r.fechaObj, unidades: 0 };
+    porDia[key].unidades += r.unidades;
+  });
+
+  const dias = Object.keys(porDia).sort((a, b) => porDia[a].fechaObj - porDia[b].fechaObj);
+  const labels = dias.map(d => {
+    const fo = porDia[d].fechaObj;
+    return fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : d;
+  });
+  const data = dias.map(d => porDia[d].unidades);
+
+  const canvas = document.getElementById('horizonteChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (chartHorizonte) chartHorizonte.destroy();
+  chartHorizonte = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Unidades',
+        data,
+        backgroundColor: '#fdbc13',
+        borderRadius: 4,
+        maxBarThickness: 48
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#181c20',
+          titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' }, padding: 12,
+          callbacks: { label: ctx => 'Unidades: ' + ctx.parsed.y.toLocaleString('es-PE') }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#ebeef4', drawBorder: false },
+          ticks: { color: '#727785', font: { family: 'JetBrains Mono', size: 10 } }
+        },
+        x: { grid: { display: false }, ticks: { color: '#727785', font: { family: 'Inter', weight: '600', size: 10 } } }
+      }
+    }
+  });
+}
+
+function exportHorizonte() {
+  const rows = (horizonteFiltered.length ? horizonteFiltered : horizonteData).map(r => ({
+    'FECHA DE LLEGADA': r.fecha,
+    'PROVEEDOR': r.proveedor,
+    'OC': r.oc,
+    'HORA': r.hora,
+    'CODIGOS': r.codigos,
+    'UNIDADES': r.unidades
+  }));
+  const hoy = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  downloadXLSX(`Horizonte_${fecha}.xlsx`, rows, 'Horizonte');
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.ghost-border').forEach(card => {
     card.addEventListener('mouseenter', () => { card.style.transform = 'translateY(-2px)'; });
     card.addEventListener('mouseleave', () => { card.style.transform = 'translateY(0)'; });
   });
   loadAllData();
+  loadHorizonte();
 });
 </script>
 </body>
