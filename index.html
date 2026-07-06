@@ -2470,22 +2470,35 @@ const HORIZONTE_PALETTE = [
 ];
 
 function renderHorizonteChart(rows) {
-  // Agrupar por fecha; dentro de cada fecha, ordenar por hora
+  // Agrupar por fecha, y dentro de cada fecha por PROVEEDOR (sumando todas sus OC del día)
   const porFecha = {};
   rows.forEach(r => {
-    const key = r.fecha || '—';
-    if (!porFecha[key]) porFecha[key] = { fechaObj: r.fechaObj, items: [] };
-    porFecha[key].items.push(r);
+    const fKey = r.fecha || '—';
+    if (!porFecha[fKey]) porFecha[fKey] = { fechaObj: r.fechaObj, porProveedor: {} };
+    const pKey = r.proveedor || '—';
+    if (!porFecha[fKey].porProveedor[pKey]) {
+      porFecha[fKey].porProveedor[pKey] = { proveedor: pKey, unidades: 0, ocs: [], horas: [] };
+    }
+    const g = porFecha[fKey].porProveedor[pKey];
+    g.unidades += r.unidades;
+    if (r.oc)   g.ocs.push(r.oc);
+    if (r.hora) g.horas.push(r.hora);
   });
 
   const fechas = Object.keys(porFecha).sort((a, b) => porFecha[a].fechaObj - porFecha[b].fechaObj);
-  fechas.forEach(f => porFecha[f].items.sort((a, b) => (a.hora || '').localeCompare(b.hora || '')));
+  fechas.forEach(f => {
+    porFecha[f].items = Object.values(porFecha[f].porProveedor).sort((a, b) => {
+      const ha = [...a.horas].sort()[0] || '';
+      const hb = [...b.horas].sort()[0] || '';
+      return ha.localeCompare(hb);
+    });
+  });
 
   const maxProveedores = fechas.length
     ? Math.min(10, Math.max(...fechas.map(f => porFecha[f].items.length)))
     : 0;
 
-  // Etiqueta de 2 líneas: fecha arriba, cantidad de proveedores abajo
+  // Etiqueta de 2 líneas: fecha arriba, cantidad de proveedores únicos abajo
   const labels = fechas.map(f => {
     const fo = porFecha[f].fechaObj;
     const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : f;
@@ -2537,13 +2550,15 @@ function renderHorizonteChart(rows) {
             title: items => {
               const it = items[0];
               const meta = it.dataset._meta ? it.dataset._meta[it.dataIndex] : null;
-              if (!meta) return '';
-              return `${meta.hora || ''}, ${meta.proveedor || ''}`.trim();
+              return meta ? meta.proveedor : '';
             },
             label: ctx => {
               const meta = ctx.dataset._meta ? ctx.dataset._meta[ctx.dataIndex] : null;
-              const val = meta ? meta.unidades : ctx.parsed.y;
-              return 'Unidades: ' + (val ?? 0).toLocaleString('es-PE');
+              if (!meta) return 'Unidades: ' + (ctx.parsed.y ?? 0).toLocaleString('es-PE');
+              const lines = ['Unidades: ' + meta.unidades.toLocaleString('es-PE')];
+              if (meta.ocs.length)   lines.push('OC: ' + meta.ocs.join(', '));
+              if (meta.horas.length) lines.push('Hora: ' + [...new Set(meta.horas)].join(', '));
+              return lines;
             }
           }
         }
