@@ -817,7 +817,13 @@ function fetchSheetData(action) {
       return resp.json();
     })
     .then(data => {
-      if (data && !Array.isArray(data) && data.error) throw new Error(data.error);
+      if (data && data.error) throw new Error(data.error);
+      if (action === 'all') {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('Respuesta inesperada del servidor para ' + action + '.');
+        }
+        return data;
+      }
       if (!Array.isArray(data)) throw new Error('Respuesta inesperada del servidor para ' + action + '.');
       return data;
     });
@@ -1106,10 +1112,11 @@ function onSearch() {
 async function loadAllData() {
   document.getElementById('syncStatus').textContent = 'Sincronizando...';
   try {
-    const [reg, det] = await Promise.all([
-      fetchSheetData('registro'),
-      fetchSheetData('detalle')
-    ]);
+    const all = await fetchSheetData('all');
+    if (all && !Array.isArray(all) && all.error) throw new Error(all.error);
+    const reg = all.registro || [];
+    const det = all.detalle  || [];
+
     registroData = reg.map(r => ({ ...r, 'ESTATUS STOCK': calcEstatusStock(r) }));
     detalleData  = det;
     registroFiltered = [...reg];
