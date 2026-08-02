@@ -139,6 +139,10 @@
       <span class="material-symbols-outlined">edit_square</span>
       <span class="font-label-md text-label-md">Registro</span>
     </div>
+    <div class="nav-item" onclick="showSection('ticket')">
+      <span class="material-symbols-outlined">confirmation_number</span>
+      <span class="font-label-md text-label-md">Ticket</span>
+    </div>
     <div class="nav-item" onclick="showSection('detalle')">
       <span class="material-symbols-outlined">list_alt</span>
       <span class="font-label-md text-label-md">Detalle</span>
@@ -472,6 +476,92 @@
         <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
           <span id="registroCount" class="text-body-sm text-on-surface-variant">—</span>
           <span id="registroTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== TICKET SECTION ===== -->
+  <div id="section-ticket" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Ticket</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Resumen por ticket (ORD) agrupando la hoja de Registro</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportTicket()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearTicketFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="ticketMesFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Proveedor</label>
+            <input id="ticketProveedorFilter" oninput="filterTicket()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Estatus</label>
+            <select id="ticketEstatusFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Completado">Completado</option>
+              <option value="Revisar">Revisar</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Búsqueda general</label>
+            <input id="ticketBuscarFilter" oninput="filterTicket()" class="form-input" placeholder="Ticket, documento u OC..." type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('mes')">MES <span class="material-symbols-outlined text-[12px]" id="ticketsort-mes">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ticket')">TICKET <span class="material-symbols-outlined text-[12px]" id="ticketsort-ticket">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('recibida')">CANTIDAD RECIBIDA <span class="material-symbols-outlined text-[12px]" id="ticketsort-recibida">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ingresada')">CANTIDAD INGRESADA <span class="material-symbols-outlined text-[12px]" id="ticketsort-ingresada">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('inicio')">INICIO <span class="material-symbols-outlined text-[12px]" id="ticketsort-inicio">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('termino')">TERMINO <span class="material-symbols-outlined text-[12px]" id="ticketsort-termino">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">ESTATUS</th>
+              </tr>
+            </thead>
+            <tbody id="ticketBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="10" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="ticketCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="ticketTotal" class="text-body-sm font-bold text-primary">—</span>
         </div>
       </div>
     </section>
@@ -1126,6 +1216,7 @@ async function loadAllData() {
     document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit'});
 
     renderRegistro();
+    renderTicket();
     renderDetalle();
     renderPanel();
     renderKPI();
@@ -1435,6 +1526,199 @@ function renderRegistroTable(rows) {
   }).join('');
 
   document.getElementById('registroCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+}
+
+// ========== TICKET (resumen agrupado por ORD, a partir de Registro) ==========
+let ticketData = [];
+let ticketFiltered = [];
+let ticketSortCol = null, ticketSortDir = 1;
+
+// Estatus de un ticket según CANTIDAD RECIBIDA (suma QUANTITY) vs CANTIDAD INGRESADA (suma STOCK):
+// - ingresada == 0            -> "Completado"
+// - recibida == ingresada     -> "Pendiente"
+// - recibida > ingresada > 0  -> "En proceso"
+// - ingresada > recibida      -> "Revisar" (caso no esperado)
+function calcEstatusTicket(recibida, ingresada) {
+  if (ingresada === 0) return 'Completado';
+  if (recibida === ingresada) return 'Pendiente';
+  if (recibida > ingresada) return 'En proceso';
+  return 'Revisar';
+}
+
+// Agrupa registroData por ORD (ticket), usando REFERENTE como OC, y REGISTRO
+// (fecha/hora de cada fila) para calcular inicio/término del ticket.
+function buildTicketData() {
+  const groups = {};
+  registroData.forEach(r => {
+    const ticket = colVal(r, ['ORD']);
+    if (!ticket) return; // se omiten filas sin ORD/ticket
+
+    if (!groups[ticket]) {
+      groups[ticket] = {
+        ticket,
+        mes: colVal(r, ['MES']) || getMesFromRegistro(r),
+        documento: colVal(r, ['DOCUMENTO']),
+        oc: colVal(r, ['REFERENTE']),
+        proveedor: colVal(r, ['PROVEEDOR']),
+        recibida: 0,
+        ingresada: 0,
+        inicio: null,
+        termino: null
+      };
+    }
+    const g = groups[ticket];
+    if (!g.documento) g.documento = colVal(r, ['DOCUMENTO']);
+    if (!g.oc)         g.oc = colVal(r, ['REFERENTE']);
+    if (!g.proveedor)  g.proveedor = colVal(r, ['PROVEEDOR']);
+    if (!g.mes)        g.mes = colVal(r, ['MES']) || getMesFromRegistro(r);
+
+    const qty   = parseFloat(colVal(r, ['QUANTITY']));
+    const stock = parseFloat(colVal(r, ['STOCK']));
+    g.recibida  += isNaN(qty)   ? 0 : qty;
+    g.ingresada += isNaN(stock) ? 0 : stock;
+
+    const fechaReg = colVal(r, ['REGISTRO']);
+    if (fechaReg) {
+      const d = new Date(fechaReg.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'));
+      if (!isNaN(d)) {
+        if (!g.inicio  || d < g.inicio)  g.inicio  = d;
+        if (!g.termino || d > g.termino) g.termino = d;
+      }
+    }
+  });
+
+  return Object.values(groups).map(g => ({
+    ...g,
+    estatus: calcEstatusTicket(g.recibida, g.ingresada)
+  }));
+}
+
+function renderTicket() {
+  if (!registroData.length) return;
+  ticketData = buildTicketData();
+  ticketFiltered = [...ticketData];
+
+  const meses = MESES_ES.filter(m => ticketData.some(t => String(t.mes || '').toLowerCase().includes(m.substring(0, 3))));
+  const selMes = document.getElementById('ticketMesFilter');
+  if (selMes) {
+    selMes.innerHTML = '<option value="">Todos los meses</option>' +
+      meses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
+  }
+
+  filterTicket();
+}
+
+function clearTicketFilters() {
+  ['ticketMesFilter', 'ticketProveedorFilter', 'ticketEstatusFilter', 'ticketBuscarFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterTicket();
+}
+
+function filterTicket() {
+  const mes = (document.getElementById('ticketMesFilter')?.value || '').toLowerCase();
+  const prov = (document.getElementById('ticketProveedorFilter')?.value || '').toLowerCase();
+  const estatus = document.getElementById('ticketEstatusFilter')?.value || '';
+  const q = (document.getElementById('ticketBuscarFilter')?.value || '').toLowerCase();
+
+  ticketFiltered = ticketData.filter(t => {
+    if (mes && !String(t.mes || '').toLowerCase().includes(mes)) return false;
+    if (estatus && t.estatus !== estatus) return false;
+    if (prov && !String(t.proveedor || '').toLowerCase().includes(prov)) return false;
+    if (q) {
+      const hay = [t.ticket, t.documento, t.oc, t.proveedor].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (ticketSortCol) sortTicketRows();
+  renderTicketTable(ticketFiltered);
+}
+
+function sortTicket(col) {
+  if (ticketSortCol === col) ticketSortDir *= -1;
+  else { ticketSortCol = col; ticketSortDir = 1; }
+  document.querySelectorAll('[id^="ticketsort-"]').forEach(el => el.textContent = 'unfold_more');
+  const el = document.getElementById('ticketsort-' + col);
+  if (el) el.textContent = ticketSortDir === 1 ? 'arrow_upward' : 'arrow_downward';
+  sortTicketRows();
+  renderTicketTable(ticketFiltered);
+}
+
+function sortTicketRows() {
+  ticketFiltered.sort((a, b) => {
+    let va = a[ticketSortCol], vb = b[ticketSortCol];
+    if (va instanceof Date || vb instanceof Date) {
+      va = va ? va.getTime() : 0; vb = vb ? vb.getTime() : 0;
+      return (va - vb) * ticketSortDir;
+    }
+    if (typeof va === 'number' || typeof vb === 'number') {
+      return ((va || 0) - (vb || 0)) * ticketSortDir;
+    }
+    return String(va || '').localeCompare(String(vb || '')) * ticketSortDir;
+  });
+}
+
+const TICKET_ESTATUS_STYLES = {
+  'PENDIENTE':  'bg-slate-100 text-slate-600',
+  'EN PROCESO': 'bg-amber-100 text-amber-700',
+  'COMPLETADO': 'bg-green-100 text-green-700',
+  'REVISAR':    'bg-purple-100 text-purple-700'
+};
+
+function fmtFechaCorta(d) {
+  return d ? d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+}
+
+function renderTicketTable(rows) {
+  const tbody = document.getElementById('ticketBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    document.getElementById('ticketCount').textContent = '0 tickets';
+    document.getElementById('ticketTotal').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t => {
+    const mesCap = t.mes ? String(t.mes).charAt(0).toUpperCase() + String(t.mes).slice(1) : '—';
+    const cls = TICKET_ESTATUS_STYLES[String(t.estatus).toUpperCase()] || 'bg-gray-100 text-gray-600';
+    return `<tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.ticket || '—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${t.documento || '—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.oc || '—'}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[200px] truncate" title="${t.proveedor || ''}">${t.proveedor || '—'}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${t.recibida.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${t.ingresada.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.inicio)}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.termino)}</td>
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${t.estatus || '—'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const totalRecibida = rows.reduce((s, t) => s + t.recibida, 0);
+  const totalIngresada = rows.reduce((s, t) => s + t.ingresada, 0);
+  document.getElementById('ticketCount').textContent = rows.length.toLocaleString('es-PE') + ' tickets';
+  document.getElementById('ticketTotal').textContent =
+    'Recibido: ' + totalRecibida.toLocaleString('es-PE') + ' / Ingresado: ' + totalIngresada.toLocaleString('es-PE');
+}
+
+function exportTicket() {
+  const rows = (ticketFiltered.length ? ticketFiltered : ticketData).map(t => ({
+    'MES': t.mes,
+    'TICKET': t.ticket,
+    'DOCUMENTO': t.documento,
+    'OC': t.oc,
+    'PROVEEDOR': t.proveedor,
+    'CANTIDAD RECIBIDA': t.recibida,
+    'CANTIDAD INGRESADA': t.ingresada,
+    'INICIO': fmtFechaCorta(t.inicio),
+    'TERMINO': fmtFechaCorta(t.termino),
+    'ESTATUS': t.estatus
+  }));
+  downloadXLSX(buildFilename(rows, 'Ticket'), rows, 'Ticket');
 }
 
 // ========== RENDER DETALLE ==========
