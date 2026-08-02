@@ -237,6 +237,15 @@
             <div id="notifPendingList" class="max-h-[220px] overflow-auto hide-scrollbar divide-y divide-outline-variant">
               <div class="px-lg py-md text-center text-body-sm text-on-surface-variant">Cargando...</div>
             </div>
+
+            <!-- Alertas de Lead Time por Ticket -->
+            <div class="px-lg py-sm bg-surface-container-low/60 flex items-center gap-sm border-t border-outline-variant">
+              <span class="material-symbols-outlined text-error text-[16px]">schedule</span>
+              <span class="font-label-md text-label-md text-on-surface-variant uppercase">Tickets con retraso (Lead Time)</span>
+            </div>
+            <div id="notifLeadTimeList" class="max-h-[220px] overflow-auto hide-scrollbar divide-y divide-outline-variant">
+              <div class="px-lg py-md text-center text-body-sm text-on-surface-variant">Cargando...</div>
+            </div>
           </div>
         </div>
         <button class="p-base hover:bg-surface-container-high rounded-full transition-colors">
@@ -532,6 +541,15 @@
             <label class="form-label">Búsqueda general</label>
             <input id="ticketBuscarFilter" oninput="filterTicket()" class="form-input" placeholder="Ticket, documento u OC..." type="text"/>
           </div>
+          <div>
+            <label class="form-label">Lead Time</label>
+            <select id="ticketLeadTimeFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos</option>
+              <option value="red">Retraso en reporte</option>
+              <option value="amber">Pendiente (1 día)</option>
+              <option value="green">En tiempo</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -542,6 +560,7 @@
             <thead class="bg-surface-container-low sticky top-0 z-10">
               <tr>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('mes')">MES <span class="material-symbols-outlined text-[12px]" id="ticketsort-mes">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ingreso')">INGRESO <span class="material-symbols-outlined text-[12px]" id="ticketsort-ingreso">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ticket')">TICKET <span class="material-symbols-outlined text-[12px]" id="ticketsort-ticket">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
@@ -551,10 +570,11 @@
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('inicio')">INICIO <span class="material-symbols-outlined text-[12px]" id="ticketsort-inicio">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('termino')">TERMINO <span class="material-symbols-outlined text-[12px]" id="ticketsort-termino">unfold_more</span></th>
                 <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">ESTATUS</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LEAD TIME</th>
               </tr>
             </thead>
             <tbody id="ticketBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="10" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1545,8 +1565,30 @@ function calcEstatusTicket(recibida, ingresada) {
   return 'Revisar';
 }
 
-// Agrupa registroData por ORD (ticket), usando REFERENTE como OC, y REGISTRO
-// (fecha/hora de cada fila) para calcular inicio/término del ticket.
+// Lead Time del ticket: solo aplica si el ticket sigue "Pendiente" o "En proceso".
+// Se calcula contra la fecha INGRESO (fecha de llegada):
+// - >= 2 días desde INGRESO  -> "Retraso en reporte" (rojo)
+// - == 1 día desde INGRESO   -> "Pendiente" (ámbar)
+// - 0 días (mismo día)       -> "En tiempo" (verde)
+function calcLeadTimeStatus(estatus, ingresoStr) {
+  if (estatus !== 'Pendiente' && estatus !== 'En proceso') return { label: '—', level: 'none' };
+  if (!ingresoStr) return { label: '—', level: 'none' };
+  const p = ingresoStr.split('/');
+  if (p.length !== 3) return { label: '—', level: 'none' };
+  const ingresoDate = new Date(+p[2], +p[1] - 1, +p[0]);
+  if (isNaN(ingresoDate)) return { label: '—', level: 'none' };
+
+  const hoy = new Date();
+  const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const diffDias = Math.round((hoyMid - ingresoDate) / 86400000);
+
+  if (diffDias >= 2) return { label: 'Retraso en reporte', level: 'red', diffDias };
+  if (diffDias === 1) return { label: 'Pendiente', level: 'amber', diffDias };
+  return { label: 'En tiempo', level: 'green', diffDias };
+}
+
+// Agrupa registroData por ORD (ticket), usando REFERENTE como OC, INGRESO como
+// fecha de llegada, y REGISTRO (fecha/hora de cada fila) para inicio/término.
 function buildTicketData() {
   const groups = {};
   registroData.forEach(r => {
@@ -1557,6 +1599,7 @@ function buildTicketData() {
       groups[ticket] = {
         ticket,
         mes: colVal(r, ['MES']) || getMesFromRegistro(r),
+        ingreso: normalizeFecha(colVal(r, ['INGRESO'])),
         documento: colVal(r, ['DOCUMENTO']),
         oc: colVal(r, ['REFERENTE']),
         proveedor: colVal(r, ['PROVEEDOR']),
@@ -1571,6 +1614,7 @@ function buildTicketData() {
     if (!g.oc)         g.oc = colVal(r, ['REFERENTE']);
     if (!g.proveedor)  g.proveedor = colVal(r, ['PROVEEDOR']);
     if (!g.mes)        g.mes = colVal(r, ['MES']) || getMesFromRegistro(r);
+    if (!g.ingreso)    g.ingreso = normalizeFecha(colVal(r, ['INGRESO']));
 
     const qty   = parseFloat(colVal(r, ['QUANTITY']));
     const stock = parseFloat(colVal(r, ['STOCK']));
@@ -1587,10 +1631,11 @@ function buildTicketData() {
     }
   });
 
-  return Object.values(groups).map(g => ({
-    ...g,
-    estatus: calcEstatusTicket(g.recibida, g.ingresada)
-  }));
+  return Object.values(groups).map(g => {
+    const estatus = calcEstatusTicket(g.recibida, g.ingresada);
+    const lt = calcLeadTimeStatus(estatus, g.ingreso);
+    return { ...g, estatus, leadTime: lt.label, leadTimeLevel: lt.level };
+  });
 }
 
 function renderTicket() {
@@ -1609,7 +1654,7 @@ function renderTicket() {
 }
 
 function clearTicketFilters() {
-  ['ticketMesFilter', 'ticketProveedorFilter', 'ticketEstatusFilter', 'ticketBuscarFilter'].forEach(id => {
+  ['ticketMesFilter', 'ticketProveedorFilter', 'ticketEstatusFilter', 'ticketBuscarFilter', 'ticketLeadTimeFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1621,10 +1666,12 @@ function filterTicket() {
   const prov = (document.getElementById('ticketProveedorFilter')?.value || '').toLowerCase();
   const estatus = document.getElementById('ticketEstatusFilter')?.value || '';
   const q = (document.getElementById('ticketBuscarFilter')?.value || '').toLowerCase();
+  const leadTime = document.getElementById('ticketLeadTimeFilter')?.value || '';
 
   ticketFiltered = ticketData.filter(t => {
     if (mes && !String(t.mes || '').toLowerCase().includes(mes)) return false;
     if (estatus && t.estatus !== estatus) return false;
+    if (leadTime && t.leadTimeLevel !== leadTime) return false;
     if (prov && !String(t.proveedor || '').toLowerCase().includes(prov)) return false;
     if (q) {
       const hay = [t.ticket, t.documento, t.oc, t.proveedor].join(' ').toLowerCase();
@@ -1668,6 +1715,13 @@ const TICKET_ESTATUS_STYLES = {
   'REVISAR':    'bg-purple-100 text-purple-700'
 };
 
+const LEAD_TIME_STYLES = {
+  red:   'bg-red-100 text-red-700',
+  amber: 'bg-amber-100 text-amber-700',
+  green: 'bg-green-100 text-green-700',
+  none:  'bg-gray-100 text-gray-500'
+};
+
 function fmtFechaCorta(d) {
   return d ? d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 }
@@ -1675,7 +1729,7 @@ function fmtFechaCorta(d) {
 function renderTicketTable(rows) {
   const tbody = document.getElementById('ticketBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('ticketCount').textContent = '0 tickets';
     document.getElementById('ticketTotal').textContent = '';
     return;
@@ -1684,8 +1738,10 @@ function renderTicketTable(rows) {
   tbody.innerHTML = rows.map(t => {
     const mesCap = t.mes ? String(t.mes).charAt(0).toUpperCase() + String(t.mes).slice(1) : '—';
     const cls = TICKET_ESTATUS_STYLES[String(t.estatus).toUpperCase()] || 'bg-gray-100 text-gray-600';
+    const ltCls = LEAD_TIME_STYLES[t.leadTimeLevel] || LEAD_TIME_STYLES.none;
     return `<tr class="hover:bg-blue-50/40 transition-colors">
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${t.ingreso || '—'}</td>
       <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.ticket || '—'}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${t.documento || '—'}</td>
       <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.oc || '—'}</td>
@@ -1695,6 +1751,7 @@ function renderTicketTable(rows) {
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.inicio)}</td>
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.termino)}</td>
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${t.estatus || '—'}</span></td>
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${ltCls}">${t.leadTime || '—'}</span></td>
     </tr>`;
   }).join('');
 
@@ -1708,6 +1765,7 @@ function renderTicketTable(rows) {
 function exportTicket() {
   const rows = (ticketFiltered.length ? ticketFiltered : ticketData).map(t => ({
     'MES': t.mes,
+    'INGRESO': t.ingreso,
     'TICKET': t.ticket,
     'DOCUMENTO': t.documento,
     'OC': t.oc,
@@ -1716,7 +1774,8 @@ function exportTicket() {
     'CANTIDAD INGRESADA': t.ingresada,
     'INICIO': fmtFechaCorta(t.inicio),
     'TERMINO': fmtFechaCorta(t.termino),
-    'ESTATUS': t.estatus
+    'ESTATUS': t.estatus,
+    'LEAD TIME': t.leadTime
   }));
   downloadXLSX(buildFilename(rows, 'Ticket'), rows, 'Ticket');
 }
@@ -2250,20 +2309,46 @@ function renderNotifications() {
     list.innerHTML = `<div class="px-lg py-md text-center text-body-sm text-secondary flex items-center justify-center gap-xs">
       <span class="material-symbols-outlined text-[18px]">check_circle</span> Todo registrado, sin pendientes
     </div>`;
-    dot.classList.add('hidden');
-    return;
+  } else {
+    list.innerHTML = pending.map(g => `
+      <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('registro'); document.getElementById('registroSearch').value='${g.ord}'; filterRegistro(); toggleNotifPanel();">
+        <div class="flex justify-between items-center">
+          <span class="font-mono-data text-[12px] font-bold text-primary">OC ${g.ord}</span>
+          <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">${g.stockPendiente.toLocaleString('es-PE')} pend.</span>
+        </div>
+        <p class="text-[11px] text-on-surface-variant truncate">${g.prov || g.doc || 'Sin proveedor'} · ${g.items} ítem(s)</p>
+      </div>
+    `).join('');
   }
 
-  dot.classList.remove('hidden');
-  list.innerHTML = pending.map(g => `
-    <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('registro'); document.getElementById('registroSearch').value='${g.ord}'; filterRegistro(); toggleNotifPanel();">
-      <div class="flex justify-between items-center">
-        <span class="font-mono-data text-[12px] font-bold text-primary">OC ${g.ord}</span>
-        <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">${g.stockPendiente.toLocaleString('es-PE')} pend.</span>
-      </div>
-      <p class="text-[11px] text-on-surface-variant truncate">${g.prov || g.doc || 'Sin proveedor'} · ${g.items} ítem(s)</p>
-    </div>
-  `).join('');
+  // Alertas de Lead Time: tickets Pendiente/En proceso con 2+ días desde INGRESO
+  const leadTimeList = document.getElementById('notifLeadTimeList');
+  const atrasados = (ticketData || []).filter(t => t.leadTimeLevel === 'red');
+
+  if (leadTimeList) {
+    if (!atrasados.length) {
+      leadTimeList.innerHTML = `<div class="px-lg py-md text-center text-body-sm text-secondary flex items-center justify-center gap-xs">
+        <span class="material-symbols-outlined text-[18px]">check_circle</span> Sin tickets con retraso
+      </div>`;
+    } else {
+      leadTimeList.innerHTML = atrasados.map(t => `
+        <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('ticket'); document.getElementById('ticketBuscarFilter').value='${t.ticket}'; filterTicket(); toggleNotifPanel();">
+          <div class="flex justify-between items-center">
+            <span class="font-mono-data text-[12px] font-bold text-primary">Ticket ${t.ticket}</span>
+            <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">Retraso</span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant truncate">${t.proveedor || t.documento || 'Sin proveedor'} · Ingreso: ${t.ingreso || '—'}</p>
+        </div>
+      `).join('');
+    }
+  }
+
+  // El punto rojo se muestra si hay OC con stock pendiente o tickets con retraso de Lead Time
+  if (!pending.length && !atrasados.length) {
+    dot.classList.add('hidden');
+  } else {
+    dot.classList.remove('hidden');
+  }
 }
 
 
