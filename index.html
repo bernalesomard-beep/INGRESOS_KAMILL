@@ -174,7 +174,7 @@
     <div class="flex items-center gap-xl">
       <div class="relative">
         <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
-        <input id="searchInput" class="pl-10 pr-md py-xs bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary w-64 text-body-md" placeholder="Buscar datos..." type="text" oninput="onSearch()"/>
+        <input id="searchInput" class="pl-10 pr-md py-xs bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary w-64 text-body-md" placeholder="Buscar datos..." type="text" oninput="onSearchDebounced()"/>
       </div>
     </div>
     <div class="flex items-center gap-lg">
@@ -262,7 +262,7 @@
 
 <!-- Main Content -->
 <main class="ml-64 pt-16 min-h-screen">
-<div class="max-w-[1440px] mx-auto p-grid-margin">
+<div class="max-w-[1900px] mx-auto p-grid-margin">
 
   <!-- ===== PANEL SECTION ===== -->
   <div id="section-panel" class="section-content active">
@@ -341,11 +341,11 @@
           </div>
           <div>
             <label class="form-label">Documento</label>
-            <input id="panelDocFilter" oninput="filterPanelTable()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+            <input id="panelDocFilter" oninput="filterPanelTableDebounced()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
           </div>
           <div>
             <label class="form-label">Material</label>
-            <input id="panelMatFilter" oninput="filterPanelTable()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
+            <input id="panelMatFilter" oninput="filterPanelTableDebounced()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
           </div>
         </div>
         <!-- Table -->
@@ -433,11 +433,11 @@
           </div>
           <div>
             <label class="form-label">Tipo</label>
-            <input id="registroTipoFilter" oninput="filterRegistro()" class="form-input" placeholder="Buscar tipo..." type="text"/>
+            <input id="registroTipoFilter" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar tipo..." type="text"/>
           </div>
           <div>
             <label class="form-label">Documento</label>
-            <input id="registroDocFilter" oninput="filterRegistro()" class="form-input" placeholder="Buscar documento..." type="text"/>
+            <input id="registroDocFilter" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar documento..." type="text"/>
           </div>
           <div>
             <label class="form-label">Estatus</label>
@@ -451,7 +451,7 @@
           </div>
           <div>
             <label class="form-label">Búsqueda general</label>
-            <input id="registroSearch" oninput="filterRegistro()" class="form-input" placeholder="Buscar en todo..." type="text"/>
+            <input id="registroSearch" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar en todo..." type="text"/>
           </div>
         </div>
         <div id="registroFilterChips" class="hidden px-lg pb-md flex flex-wrap gap-xs"></div>
@@ -525,7 +525,7 @@
           </div>
           <div>
             <label class="form-label">Proveedor</label>
-            <input id="ticketProveedorFilter" oninput="filterTicket()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+            <input id="ticketProveedorFilter" oninput="filterTicketDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
           </div>
           <div>
             <label class="form-label">Estatus</label>
@@ -539,7 +539,7 @@
           </div>
           <div>
             <label class="form-label">Búsqueda general</label>
-            <input id="ticketBuscarFilter" oninput="filterTicket()" class="form-input" placeholder="Ticket, documento u OC..." type="text"/>
+            <input id="ticketBuscarFilter" oninput="filterTicketDebounced()" class="form-input" placeholder="Ticket, documento u OC..." type="text"/>
           </div>
           <div>
             <label class="form-label">Lead Time</label>
@@ -622,15 +622,15 @@
           </div>
           <div>
             <label class="form-label">OC / Referente</label>
-            <input id="detalleOcFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: T001-00008729" type="text"/>
+            <input id="detalleOcFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: T001-00008729" type="text"/>
           </div>
           <div>
             <label class="form-label">Documento</label>
-            <input id="detalleDocFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+            <input id="detalleDocFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
           </div>
           <div>
             <label class="form-label">Material</label>
-            <input id="detalleMtFilter" oninput="filterDetalle()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
+            <input id="detalleMtFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
           </div>
         </div>
         <!-- Active filter chips -->
@@ -721,15 +721,15 @@
           </div>
           <div>
             <label class="form-label">Cliente (Proveedor)</label>
-            <input id="kpiClienteFilter" oninput="filterKPI()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+            <input id="kpiClienteFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
           </div>
           <div>
             <label class="form-label">Documento de Ingreso</label>
-            <input id="kpiOrdFilter" oninput="filterKPI()" class="form-input" placeholder="Buscar ORD..." type="text"/>
+            <input id="kpiOrdFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar ORD..." type="text"/>
           </div>
           <div>
             <label class="form-label">Número Guía</label>
-            <input id="kpiDocFilter" oninput="filterKPI()" class="form-input" placeholder="Buscar documento..." type="text"/>
+            <input id="kpiDocFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar documento..." type="text"/>
           </div>
         </div>
       </div>
@@ -833,7 +833,7 @@
           </div>
           <div class="md:col-span-2">
             <label class="form-label">Proveedor / Cliente</label>
-            <input id="horProveedor" oninput="filterHorizonte()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+            <input id="horProveedor" oninput="filterHorizonteDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
           </div>
         </div>
       </div>
@@ -918,11 +918,39 @@
 // usamos para guardar (APPS_SCRIPT_URL), con ?action=registro / ?action=detalle.
 // Ya no se usa corsproxy.io en ningún punto de la carga de datos.
 
-// Fetch de datos vía Apps Script (sin proxy externo, sin CORS)
-function fetchSheetData(action) {
+// Debounce: espera a que el usuario pare de escribir antes de filtrar/re-renderizar
+// tablas grandes. Los selects (onchange) siguen siendo instantáneos; solo se debounced
+// las cajas de texto de búsqueda (oninput), que son las que disparaban un re-render
+// completo en cada tecla presionada.
+function debounce(fn, wait = 250) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+// Nota: las funciones filterRegistro, filterTicket, filterDetalle, filterPanelTable,
+// filterKPI, filterHorizonte y onSearch son "function" (hoisted), por eso se pueden
+// envolver aquí aunque estén declaradas más abajo en el archivo.
+const filterRegistroDebounced   = debounce(() => filterRegistro());
+const filterTicketDebounced     = debounce(() => filterTicket());
+const filterDetalleDebounced    = debounce(() => filterDetalle());
+const filterPanelTableDebounced = debounce(() => filterPanelTable());
+const filterKPIDebounced        = debounce(() => filterKPI());
+const filterHorizonteDebounced  = debounce(() => filterHorizonte());
+const onSearchDebounced         = debounce(() => onSearch());
+
+// Fetch de datos vía Apps Script (sin proxy externo, sin CORS).
+// Incluye timeout: si Google Apps Script no responde en 20s, se corta la
+// espera y se muestra un error claro en vez de dejar "Sincronizando..." para siempre.
+function fetchSheetData(action, timeoutMs = 20000) {
   const url = APPS_SCRIPT_URL + '?action=' + action + '&_=' + Date.now();
-  return fetch(url)
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { signal: controller.signal })
     .then(resp => {
+      clearTimeout(timer);
       if (!resp.ok) throw new Error('Error de red (' + resp.status + ') al pedir ' + action);
       return resp.json();
     })
@@ -936,6 +964,13 @@ function fetchSheetData(action) {
       }
       if (!Array.isArray(data)) throw new Error('Respuesta inesperada del servidor para ' + action + '.');
       return data;
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        throw new Error('Tiempo de espera agotado (' + (timeoutMs / 1000) + 's) conectando con Google Sheets. Revisa tu conexión a internet o que el Apps Script esté desplegado y accesible.');
+      }
+      throw err;
     });
 }
 
@@ -1244,8 +1279,19 @@ async function loadAllData() {
   } catch(e) {
     console.error(e);
     document.getElementById('syncStatus').textContent = 'Error al cargar datos';
+    const errHtml = '⚠️ Error al cargar: ' + e.message + '<br><small>Verifica tu conexión a internet o que el Apps Script esté publicado correctamente.</small>';
+
     document.getElementById('panelRecentTable').innerHTML =
-      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">⚠️ Error al cargar: ' + e.message + '<br><small>Verifica que las hojas estén publicadas en la web como CSV.</small></td></tr>';
+      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const regBody = document.getElementById('registroBody');
+    if (regBody) regBody.innerHTML = '<tr><td class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const ticketBody = document.getElementById('ticketBody');
+    if (ticketBody) ticketBody.innerHTML = '<tr><td colspan="12" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const detBody = document.getElementById('detalleBody');
+    if (detBody) detBody.innerHTML = '<tr><td colspan="12" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
   }
 }
 
@@ -1276,38 +1322,55 @@ function calcEstatusStock(row) {
   return 'Revisar';
 }
 
+// Cache de claves normalizadas por fila (misma prioridad de coincidencia que antes,
+// solo evita recalcular trim()/toUpperCase() de todas las columnas en cada llamada).
+const _rowKeyPairsCache = new WeakMap();
+function _getKeyPairs(row) {
+  let pairs = _rowKeyPairsCache.get(row);
+  if (!pairs) {
+    pairs = Object.keys(row).map(k => ({ k, kn: k.trim().toUpperCase() }));
+    _rowKeyPairsCache.set(row, pairs);
+  }
+  return pairs;
+}
+
 function colVal(row, names) {
-  // Exact match first, then includes
-  for (const k of Object.keys(row)) {
-    const kn = k.trim().toUpperCase();
-    for (const n of names) {
-      if (kn === n.toUpperCase()) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+  if (!row || typeof row !== 'object') return '';
+  const pairs = _getKeyPairs(row);
+  const namesUpper = names.map(n => n.toUpperCase());
+  // Exact match first
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn === nu) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
     }
   }
-  for (const k of Object.keys(row)) {
-    const kn = k.trim().toUpperCase();
-    for (const n of names) {
-      if (kn.includes(n.toUpperCase())) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+  // Fallback: includes
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn.includes(nu)) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
     }
   }
   return '';
 }
 
-// Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS)
+// Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS), cacheado por fila
+const _mesFromRegistroCache = new WeakMap();
 function getMesFromRegistro(row) {
+  if (_mesFromRegistroCache.has(row)) return _mesFromRegistroCache.get(row);
   const reg = colVal(row, ['REGISTRO']);
-  if (!reg) return '';
-  // Try DD/MM/YYYY or YYYY-MM-DD
-  let d;
-  const parts = reg.split(/[\s\/\-:]/);
-  if (reg.includes('/')) {
-    // DD/MM/YYYY HH:MM:SS
-    d = new Date(+parts[2], +parts[1]-1, +parts[0]);
-  } else {
-    d = new Date(reg);
+  let mes = '';
+  if (reg) {
+    let d;
+    const parts = reg.split(/[\s\/\-:]/);
+    if (reg.includes('/')) {
+      d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+    } else {
+      d = new Date(reg);
+    }
+    if (!isNaN(d)) mes = MESES_ES[d.getMonth()];
   }
-  if (isNaN(d)) return '';
-  return MESES_ES[d.getMonth()];
+  _mesFromRegistroCache.set(row, mes);
+  return mes;
 }
 
 function getMesIndexFromRow(row) {
