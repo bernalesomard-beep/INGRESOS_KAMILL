@@ -613,7 +613,7 @@
           <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
           <button onclick="clearDetalleFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
         </div>
-        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-5 gap-md">
           <div>
             <label class="form-label">Mes</label>
             <select id="detalleMesFilter" onchange="filterDetalle()" class="form-input">
@@ -621,12 +621,44 @@
             </select>
           </div>
           <div>
-            <label class="form-label">OC / Referente</label>
-            <input id="detalleOcFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: T001-00008729" type="text"/>
+            <label class="form-label">Proveedor</label>
+            <select id="detalleProvFilter" onchange="onDetalleProvChange()" class="form-input">
+              <option value="">Todos los proveedores</option>
+            </select>
           </div>
-          <div>
+          <div class="relative">
+            <label class="form-label">OC / Referente</label>
+            <button type="button" id="detalleOcDropdownBtn" onclick="toggleDetalleOcDropdown()" class="form-input text-left flex items-center justify-between gap-xs">
+              <span id="detalleOcDropdownLabel" class="truncate">Todos los OC</span>
+              <span class="material-symbols-outlined text-[16px] text-on-surface-variant">expand_more</span>
+            </button>
+            <div id="detalleOcDropdownPanel" class="hidden absolute z-20 mt-xs w-full max-h-72 overflow-hidden flex flex-col bg-white border border-outline-variant rounded-lg shadow-lg">
+              <div class="p-sm border-b border-outline-variant">
+                <input id="detalleOcSearchInput" type="text" placeholder="Buscar OC / referente..." oninput="renderDetalleOcOptions()" class="form-input text-[12px]"/>
+              </div>
+              <div id="detalleOcOptionsList" class="flex flex-col overflow-auto p-xs"></div>
+              <div class="flex justify-between px-sm py-xs border-t border-outline-variant bg-surface-container-lowest">
+                <button type="button" onclick="clearDetalleOcSelection()" class="text-[11px] text-primary font-semibold hover:underline">Limpiar</button>
+                <button type="button" onclick="closeDetalleOcDropdown()" class="text-[11px] text-primary font-semibold hover:underline">Listo</button>
+              </div>
+            </div>
+          </div>
+          <div class="relative">
             <label class="form-label">Documento</label>
-            <input id="detalleDocFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+            <button type="button" id="detalleDocDropdownBtn" onclick="toggleDetalleDocDropdown()" class="form-input text-left flex items-center justify-between gap-xs">
+              <span id="detalleDocDropdownLabel" class="truncate">Todos los documentos</span>
+              <span class="material-symbols-outlined text-[16px] text-on-surface-variant">expand_more</span>
+            </button>
+            <div id="detalleDocDropdownPanel" class="hidden absolute z-20 mt-xs w-full max-h-72 overflow-hidden flex flex-col bg-white border border-outline-variant rounded-lg shadow-lg">
+              <div class="p-sm border-b border-outline-variant">
+                <input id="detalleDocSearchInput" type="text" placeholder="Buscar documento..." oninput="renderDetalleDocOptions()" class="form-input text-[12px]"/>
+              </div>
+              <div id="detalleDocOptionsList" class="flex flex-col overflow-auto p-xs"></div>
+              <div class="flex justify-between px-sm py-xs border-t border-outline-variant bg-surface-container-lowest">
+                <button type="button" onclick="clearDetalleDocSelection()" class="text-[11px] text-primary font-semibold hover:underline">Limpiar</button>
+                <button type="button" onclick="closeDetalleDocDropdown()" class="text-[11px] text-primary font-semibold hover:underline">Listo</button>
+              </div>
+            </div>
           </div>
           <div>
             <label class="form-label">Material</label>
@@ -1248,7 +1280,13 @@ function onSearch() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   if (q.length > 0) {
     showSection('detalle');
-    document.getElementById('detalleDocFilter').value = q;
+    // Selecciona (en el multi-select de Documento) todos los documentos que coincidan con la búsqueda
+    document.getElementById('detalleProvFilter').value = '';
+    refreshDetalleDocOptionsSource();
+    selectedDetalleDocs.clear();
+    detalleDocOptionsSource.filter(d => d.toLowerCase().includes(q)).forEach(d => selectedDetalleDocs.add(d));
+    renderDetalleDocOptions();
+    updateDetalleDocLabel();
     filterDetalle();
   }
 }
@@ -1844,6 +1882,9 @@ function exportTicket() {
 }
 
 // ========== RENDER DETALLE ==========
+const selectedDetalleDocs = new Set(); // documentos seleccionados (multi-select)
+const selectedDetalleOcs  = new Set(); // OC/referentes seleccionados (multi-select)
+
 function renderDetalle() {
   if (!detalleData.length) return;
 
@@ -1859,59 +1900,267 @@ function renderDetalle() {
   selDet.innerHTML = '<option value="">Todos</option>' + meses.map(m =>
     `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
 
+  // Populate proveedor filter
+  const provSet = new Set();
+  detalleData.forEach(r => {
+    const p = colVal(r, ['PROVEEDOR']);
+    if (p) provSet.add(p);
+  });
+  const provList = [...provSet].sort((a, b) => a.localeCompare(b));
+  const selProv = document.getElementById('detalleProvFilter');
+  const prevProv = selProv.value;
+  selProv.innerHTML = '<option value="">Todos los proveedores</option>' + provList.map(p =>
+    `<option value="${p}">${p}</option>`).join('');
+  if (provList.includes(prevProv)) selProv.value = prevProv;
+
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
   filterDetalle();
 }
 
+// Lista de documentos disponibles para el dropdown, dependiente del proveedor elegido
+let detalleDocOptionsSource = [];
+function refreshDetalleDocOptionsSource() {
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const base = prov
+    ? detalleData.filter(r => colVal(r, ['PROVEEDOR']).toLowerCase() === prov)
+    : detalleData;
+  const docSet = new Set();
+  base.forEach(r => {
+    const d = colVal(r, ['DOCUMENTO']);
+    if (d) docSet.add(d);
+  });
+  detalleDocOptionsSource = [...docSet].sort((a, b) => a.localeCompare(b));
+  // Quitar de la selección los documentos que ya no pertenecen al proveedor elegido
+  [...selectedDetalleDocs].forEach(d => {
+    if (!detalleDocOptionsSource.includes(d)) selectedDetalleDocs.delete(d);
+  });
+  renderDetalleDocOptions();
+  updateDetalleDocLabel();
+}
+
+// Lista de OC/Referentes disponibles para el dropdown, dependiente del proveedor elegido
+let detalleOcOptionsSource = [];
+function refreshDetalleOcOptionsSource() {
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const base = prov
+    ? detalleData.filter(r => colVal(r, ['PROVEEDOR']).toLowerCase() === prov)
+    : detalleData;
+  const ocSet = new Set();
+  base.forEach(r => {
+    const o = colVal(r, ['REFERENTE']);
+    if (o) ocSet.add(o);
+  });
+  detalleOcOptionsSource = [...ocSet].sort((a, b) => a.localeCompare(b));
+  // Quitar de la selección los OC que ya no pertenecen al proveedor elegido
+  [...selectedDetalleOcs].forEach(o => {
+    if (!detalleOcOptionsSource.includes(o)) selectedDetalleOcs.delete(o);
+  });
+  renderDetalleOcOptions();
+  updateDetalleOcLabel();
+}
+
+function onDetalleProvChange() {
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
+  filterDetalle();
+}
+
+function renderDetalleDocOptions() {
+  const list = document.getElementById('detalleDocOptionsList');
+  const q = (document.getElementById('detalleDocSearchInput')?.value || '').toLowerCase();
+  const opts = detalleDocOptionsSource.filter(d => d.toLowerCase().includes(q));
+  if (!opts.length) {
+    list.innerHTML = '<div class="px-sm py-sm text-[12px] text-on-surface-variant">Sin documentos</div>';
+    return;
+  }
+  list.innerHTML = opts.map(d => `
+    <label class="flex items-center gap-xs px-sm py-xs rounded-md hover:bg-surface-container-high cursor-pointer text-[12px]">
+      <input type="checkbox" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+        ${selectedDetalleDocs.has(d) ? 'checked' : ''} onchange="toggleDetalleDoc('${d.replace(/'/g,"\\'")}', this.checked)"/>
+      <span class="truncate">${d}</span>
+    </label>`).join('');
+}
+
+function toggleDetalleDoc(doc, checked) {
+  if (checked) selectedDetalleDocs.add(doc);
+  else selectedDetalleDocs.delete(doc);
+  updateDetalleDocLabel();
+  filterDetalle();
+}
+
+function updateDetalleDocLabel() {
+  const label = document.getElementById('detalleDocDropdownLabel');
+  const n = selectedDetalleDocs.size;
+  if (n === 0) label.textContent = 'Todos los documentos';
+  else if (n === 1) label.textContent = [...selectedDetalleDocs][0];
+  else label.textContent = `${n} documentos seleccionados`;
+}
+
+function toggleDetalleDocDropdown() {
+  const panel = document.getElementById('detalleDocDropdownPanel');
+  const opening = panel.classList.contains('hidden');
+  closeDetalleOcDropdown();
+  panel.classList.toggle('hidden');
+  if (opening) {
+    document.getElementById('detalleDocSearchInput').value = '';
+    renderDetalleDocOptions();
+    document.getElementById('detalleDocSearchInput').focus();
+  }
+}
+
+function closeDetalleDocDropdown() {
+  document.getElementById('detalleDocDropdownPanel').classList.add('hidden');
+}
+
+function clearDetalleDocSelection() {
+  selectedDetalleDocs.clear();
+  renderDetalleDocOptions();
+  updateDetalleDocLabel();
+  filterDetalle();
+}
+
+function renderDetalleOcOptions() {
+  const list = document.getElementById('detalleOcOptionsList');
+  const q = (document.getElementById('detalleOcSearchInput')?.value || '').toLowerCase();
+  const opts = detalleOcOptionsSource.filter(o => o.toLowerCase().includes(q));
+  if (!opts.length) {
+    list.innerHTML = '<div class="px-sm py-sm text-[12px] text-on-surface-variant">Sin OC / referentes</div>';
+    return;
+  }
+  list.innerHTML = opts.map(o => `
+    <label class="flex items-center gap-xs px-sm py-xs rounded-md hover:bg-surface-container-high cursor-pointer text-[12px]">
+      <input type="checkbox" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+        ${selectedDetalleOcs.has(o) ? 'checked' : ''} onchange="toggleDetalleOc('${o.replace(/'/g,"\\'")}', this.checked)"/>
+      <span class="truncate">${o}</span>
+    </label>`).join('');
+}
+
+function toggleDetalleOc(oc, checked) {
+  if (checked) selectedDetalleOcs.add(oc);
+  else selectedDetalleOcs.delete(oc);
+  updateDetalleOcLabel();
+  filterDetalle();
+}
+
+function updateDetalleOcLabel() {
+  const label = document.getElementById('detalleOcDropdownLabel');
+  const n = selectedDetalleOcs.size;
+  if (n === 0) label.textContent = 'Todos los OC';
+  else if (n === 1) label.textContent = [...selectedDetalleOcs][0];
+  else label.textContent = `${n} OC seleccionados`;
+}
+
+function toggleDetalleOcDropdown() {
+  const panel = document.getElementById('detalleOcDropdownPanel');
+  const opening = panel.classList.contains('hidden');
+  closeDetalleDocDropdown();
+  panel.classList.toggle('hidden');
+  if (opening) {
+    document.getElementById('detalleOcSearchInput').value = '';
+    renderDetalleOcOptions();
+    document.getElementById('detalleOcSearchInput').focus();
+  }
+}
+
+function closeDetalleOcDropdown() {
+  document.getElementById('detalleOcDropdownPanel').classList.add('hidden');
+}
+
+function clearDetalleOcSelection() {
+  selectedDetalleOcs.clear();
+  renderDetalleOcOptions();
+  updateDetalleOcLabel();
+  filterDetalle();
+}
+
+document.addEventListener('click', (e) => {
+  const docWrapper = document.getElementById('detalleDocDropdownBtn')?.parentElement;
+  if (docWrapper && !docWrapper.contains(e.target)) closeDetalleDocDropdown();
+  const ocWrapper = document.getElementById('detalleOcDropdownBtn')?.parentElement;
+  if (ocWrapper && !ocWrapper.contains(e.target)) closeDetalleOcDropdown();
+});
+
 function filterDetalle() {
-  const mes = document.getElementById('detalleMesFilter').value.toLowerCase();
-  const oc  = (document.getElementById('detalleOcFilter')  ? document.getElementById('detalleOcFilter').value  : '').toLowerCase();
-  const doc = document.getElementById('detalleDocFilter').value.toLowerCase();
-  const mt  = document.getElementById('detalleMtFilter').value.toLowerCase();
+  const mes  = document.getElementById('detalleMesFilter').value.toLowerCase();
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const mt   = document.getElementById('detalleMtFilter').value.toLowerCase();
 
   detalleFiltered = detalleData.filter(r => {
-    const rowMes = getMesFromRegistro(r).toLowerCase();
-    const rowOc  = colVal(r, ['REFERENTE']).toLowerCase();
-    const rowDoc = colVal(r, ['DOCUMENTO']).toLowerCase();
-    const rowMat = colVal(r, ['MATERIAL NUMBER']).toLowerCase();
-    if (mes && rowMes !== mes) return false;
-    if (oc  && !rowOc.includes(oc))  return false;
-    if (doc && !rowDoc.includes(doc)) return false;
-    if (mt  && !rowMat.includes(mt))  return false;
+    const rowMes  = getMesFromRegistro(r).toLowerCase();
+    const rowProv = colVal(r, ['PROVEEDOR']).toLowerCase();
+    const rowOc   = colVal(r, ['REFERENTE']);
+    const rowDoc  = colVal(r, ['DOCUMENTO']);
+    const rowMat  = colVal(r, ['MATERIAL NUMBER']).toLowerCase();
+    if (mes  && rowMes !== mes) return false;
+    if (prov && rowProv !== prov) return false;
+    if (selectedDetalleOcs.size && !selectedDetalleOcs.has(rowOc)) return false;
+    if (selectedDetalleDocs.size && !selectedDetalleDocs.has(rowDoc)) return false;
+    if (mt   && !rowMat.includes(mt))  return false;
     return true;
   });
 
-  updateFilterChips({ mes, oc, doc, mt });
+  updateFilterChips({ mes, prov, mt });
   selectedRows.clear();
   updateBulkBar();
   renderDetalleTable(detalleFiltered);
 }
 
 function clearDetalleFilters() {
-  ['detalleMesFilter','detalleOcFilter','detalleDocFilter','detalleMtFilter'].forEach(id => {
+  ['detalleMesFilter','detalleProvFilter','detalleMtFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  selectedDetalleDocs.clear();
+  selectedDetalleOcs.clear();
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
   filterDetalle();
 }
 
 function updateFilterChips(filters) {
   const chips = document.getElementById('filterChips');
-  const labels = { mes:'Mes', oc:'OC', doc:'Documento', mt:'Material' };
+  const labels = { mes:'Mes', prov:'Proveedor', mt:'Material' };
   const active = Object.entries(filters).filter(([,v]) => v);
-  if (!active.length) { chips.classList.add('hidden'); chips.innerHTML = ''; return; }
+  const docChips = [...selectedDetalleDocs].map(d =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      Documento: ${d}
+      <button onclick="removeDetalleDocChip('${d.replace(/'/g,"\\'")}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`);
+  const ocChips = [...selectedDetalleOcs].map(o =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      OC: ${o}
+      <button onclick="removeDetalleOcChip('${o.replace(/'/g,"\\'")}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`);
+  if (!active.length && !docChips.length && !ocChips.length) { chips.classList.add('hidden'); chips.innerHTML = ''; return; }
   chips.classList.remove('hidden');
   chips.innerHTML = active.map(([k, v]) =>
     `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
       ${labels[k]}: ${v}
       <button onclick="clearChip('${k}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
     </span>`
-  ).join('');
+  ).join('') + ocChips.join('') + docChips.join('');
+}
+
+function removeDetalleDocChip(doc) {
+  selectedDetalleDocs.delete(doc);
+  updateDetalleDocLabel();
+  renderDetalleDocOptions();
+  filterDetalle();
+}
+
+function removeDetalleOcChip(oc) {
+  selectedDetalleOcs.delete(oc);
+  updateDetalleOcLabel();
+  renderDetalleOcOptions();
+  filterDetalle();
 }
 
 function clearChip(key) {
-  const map = { mes:'detalleMesFilter', oc:'detalleOcFilter', doc:'detalleDocFilter', mt:'detalleMtFilter' };
+  const map = { mes:'detalleMesFilter', prov:'detalleProvFilter', mt:'detalleMtFilter' };
   const el = document.getElementById(map[key]);
   if (el) el.value = '';
+  if (key === 'prov') { refreshDetalleDocOptionsSource(); refreshDetalleOcOptionsSource(); }
   filterDetalle();
 }
 
@@ -2186,7 +2435,7 @@ function renderPanelTable(rows) {
 // ========== EXPORT XLSX (SheetJS) ==========
 // Columnas que deben ser texto para evitar notación científica
 const FORCE_TEXT_COLS = ['ID','EAN','LOTE','COD','CODE','CODIGO','BARCODE',
-  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL NUMBER','REFERENTE','DOCUMENTO',
+  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL','MATERIAL NUMBER','REFERENTE','DOCUMENTO',
   'ORD','REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES','PROVEEDOR',
   'FECHA','MES','MES - AÑO','FECHA DE RECEPCIÓN','FECHA DE EMISIÓN NI',
   'FECHA RECEPCIÓN','FECHA EMISIÓN','FECHA DE EJECUCIÓN','FECHA EJECUCION',
@@ -2213,8 +2462,3310 @@ function downloadXLSX(filename, data, sheetName) {
       if (/^[A-Za-z]{3}-\d{2}$/.test(s))   return s;   // Jun-26 → texto
       if (s.includes('/'))                  return s;   // cualquier fecha con /
       if (s === '-')                        return s;   // guión siempre texto
-      const n = parseFloat(s.replace(/,/g,''));
-      if (!isNaN(n) && s !== '' && !/[a-zA-Z]/.test(s) && !/^0\d/.test(s)) return n;
+      // Solo convertir a número si el string COMPLETO es numérico (evita que
+      // "14-00001242" se trunque a 14 por un parseFloat parcial)
+      const isFullNumber = /^-?\d+(\.\d+)?$/.test(s.replace(/,/g,''));
+      if (isFullNumber && s !== '' && !/^0\d/.test(s)) {
+        return parseFloat(s.replace(/,/g,''));
+      }
+      return s;
+    })
+  );
+
+  const aoa = [aoaHeader, ...aoaRows];
+  const ws  = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Forzar tipo string en columnas de texto
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  cols.forEach((c, ci) => {
+    if (colIsText(c)) {
+      for (let ri = 1; ri <= range.e.r; ri++) {
+        const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+        if (ws[addr]) ws[addr].t = 's';
+      }
+    }
+  });
+  // Forzar tipo string en cualquier celda cuyo valor sea fecha o guión
+  for (let ri = 1; ri <= range.e.r; ri++) {
+    for (let ci = 0; ci <= range.e.c; ci++) {
+      const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+      if (!ws[addr]) continue;
+      const v = String(ws[addr].v || '');
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(v) || /^[A-Za-z]{3}-\d{2}$/.test(v) || v === '-') {
+        ws[addr].t = 's';
+      }
+    }
+  }
+
+  ws['!cols'] = cols.map((c, ci) => {
+    const maxLen = Math.max(c.length, ...aoaRows.map(r => String(r[ci]||'').length));
+    return { wch: Math.min(maxLen + 2, 40) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+  XLSX.writeFile(wb, filename);
+}
+
+// Nombre dinámico: PREFIJO_DOCUMENTO_FECHA.xlsx
+function buildFilename(rows, prefix) {
+  const hoy   = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  if (rows && rows.length) {
+    const docCount = {};
+    rows.forEach(r => {
+      const d = colVal(r, ['DOCUMENTO']) || colVal(r, ['REFERENTE']) || '';
+      if (d) docCount[d] = (docCount[d] || 0) + 1;
+    });
+    const topDoc = Object.entries(docCount).sort((a,b) => b[1]-a[1])[0];
+    if (topDoc) {
+      const safe = topDoc[0].replace(/[^a-zA-Z0-9\-]/g,'_');
+      return `${prefix}_${safe}_${fecha}.xlsx`;
+    }
+  }
+  return `${prefix}_${fecha}.xlsx`;
+}
+
+function exportDetalle() {
+  const rows = detalleFiltered.length ? detalleFiltered : detalleData;
+  // Exportar con cabeceras visuales igual a la tabla
+  const mapped = rows.map(r => ({
+    'MES':         getMesFromRegistro(r),
+    'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
+    'OC':          colVal(r, ['REFERENTE']),
+    'PROVEEDOR':   colVal(r, ['PROVEEDOR']),
+    'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
+    'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
+    'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
+    'EAN':         colVal(r, ['EAN-CODE','COD-EAN']),
+    'LOTE':        colVal(r, ['LOTE']),
+    'EXPIRA':      colVal(r, ['EXPIRA']),
+    'CANTIDAD':    colVal(r, ['CANT.','CANT']),
+  }));
+  downloadXLSX(buildFilename(rows, 'Detalle'), mapped, 'Detalle');
+}
+function exportSelected() {
+  const rows = [...selectedRows].map(i => detalleFiltered[i]);
+  const mapped = rows.map(r => ({
+    'MES':         getMesFromRegistro(r),
+    'FECHA':       colVal(r, ['REGISTRO']).split(' ')[0],
+    'OC':          colVal(r, ['REFERENTE']),
+    'PROVEEDOR':   colVal(r, ['PROVEEDOR']),
+    'DOCUMENTO':   colVal(r, ['DOCUMENTO']),
+    'MATERIAL':    colVal(r, ['MATERIAL NUMBER']),
+    'DESCRIPCION': colVal(r, ['ARTICLE DESCRIPTION']),
+    'EAN':         colVal(r, ['EAN-CODE','COD-EAN']),
+    'LOTE':        colVal(r, ['LOTE']),
+    'EXPIRA':      colVal(r, ['EXPIRA']),
+    'CANTIDAD':    colVal(r, ['CANT.','CANT']),
+  }));
+  downloadXLSX(buildFilename(rows, 'Seleccion'), mapped, 'Seleccion');
+}
+function exportPanel() {
+  downloadXLSX(buildFilename(detalleData, 'Panel'), detalleData, 'Panel');
+}
+function exportPanelTable() {
+  const rows = panelTableFiltered.length ? panelTableFiltered : panelTableData;
+  downloadXLSX(buildFilename(rows, 'Panel_Detalle'), rows, 'Ingresos');
+}
+function exportRegistro() {
+  const rows = registroFiltered.length ? registroFiltered : registroData;
+  downloadXLSX(buildFilename(rows, 'Registro'), rows, 'Registro');
+}
+function exportRegistroSelected() {
+  const rows = [...selectedRegistroRows].map(i => registroFiltered[i]);
+  downloadXLSX(buildFilename(rows, 'Reg_Seleccion'), rows, 'Registro');
+}
+
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name; a.click();
+}
+
+// ========== NOTIFICACIONES: OC con STOCK pendiente ==========
+function toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  panel.classList.toggle('hidden');
+}
+
+// Cerrar panel al hacer clic afuera
+document.addEventListener('click', e => {
+  const panel = document.getElementById('notifPanel');
+  const btn   = document.getElementById('notifBtn');
+  if (!panel || panel.classList.contains('hidden')) return;
+  if (!panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.add('hidden');
+  }
+});
+
+function renderNotifications() {
+  if (!registroData.length) return;
+
+  // Agrupar por ORD (OC) y sumar STOCK pendiente (valores > 0)
+  const groups = {};
+  registroData.forEach(r => {
+    const ord  = colVal(r, ['ORD']);
+    const doc  = colVal(r, ['DOCUMENTO']);
+    const prov = colVal(r, ['PROVEEDOR']);
+    const stockRaw = colVal(r, ['STOCK']);
+    const stock = parseFloat(String(stockRaw).replace(/[^0-9.-]/g,'')) || 0;
+    if (!ord) return;
+    if (!groups[ord]) groups[ord] = { ord, doc, prov, stockPendiente: 0, items: 0 };
+    groups[ord].stockPendiente += stock;
+    groups[ord].items += 1;
+  });
+
+  const pending = Object.values(groups).filter(g => g.stockPendiente > 0);
+
+  const list = document.getElementById('notifPendingList');
+  const dot  = document.getElementById('notifDot');
+
+  if (!pending.length) {
+    list.innerHTML = `<div class="px-lg py-md text-center text-body-sm text-secondary flex items-center justify-center gap-xs">
+      <span class="material-symbols-outlined text-[18px]">check_circle</span> Todo registrado, sin pendientes
+    </div>`;
+  } else {
+    list.innerHTML = pending.map(g => `
+      <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('registro'); document.getElementById('registroSearch').value='${g.ord}'; filterRegistro(); toggleNotifPanel();">
+        <div class="flex justify-between items-center">
+          <span class="font-mono-data text-[12px] font-bold text-primary">OC ${g.ord}</span>
+          <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">${g.stockPendiente.toLocaleString('es-PE')} pend.</span>
+        </div>
+        <p class="text-[11px] text-on-surface-variant truncate">${g.prov || g.doc || 'Sin proveedor'} · ${g.items} ítem(s)</p>
+      </div>
+    `).join('');
+  }
+
+  // Alertas de Lead Time: tickets Pendiente/En proceso con 2+ días desde INGRESO
+  const leadTimeList = document.getElementById('notifLeadTimeList');
+  const atrasados = (ticketData || []).filter(t => t.leadTimeLevel === 'red');
+
+  if (leadTimeList) {
+    if (!atrasados.length) {
+      leadTimeList.innerHTML = `<div class="px-lg py-md text-center text-body-sm text-secondary flex items-center justify-center gap-xs">
+        <span class="material-symbols-outlined text-[18px]">check_circle</span> Sin tickets con retraso
+      </div>`;
+    } else {
+      leadTimeList.innerHTML = atrasados.map(t => `
+        <div class="px-lg py-sm hover:bg-surface-container-high transition-colors cursor-pointer" onclick="showSection('ticket'); document.getElementById('ticketBuscarFilter').value='${t.ticket}'; filterTicket(); toggleNotifPanel();">
+          <div class="flex justify-between items-center">
+            <span class="font-mono-data text-[12px] font-bold text-primary">Ticket ${t.ticket}</span>
+            <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-error/10 text-error">Retraso</span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant truncate">${t.proveedor || t.documento || 'Sin proveedor'} · Ingreso: ${t.ingreso || '—'}</p>
+        </div>
+      `).join('');
+    }
+  }
+
+  // El punto rojo se muestra si hay OC con stock pendiente o tickets con retraso de Lead Time
+  if (!pending.length && !atrasados.length) {
+    dot.classList.add('hidden');
+  } else {
+    dot.classList.remove('hidden');
+  }
+}
+
+
+let kpiData     = [];
+let kpiFiltered = [];
+const selectedKPIRows = new Set();
+
+// Obtener valor de columna del sheet Registro por nombre exacto o parcial
+function rCol(row, names) {
+  return colVal(row, names) || '';
+}
+
+// Calcular siguiente día hábil (lunes a viernes)
+function nextBusinessDay(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  let d;
+  if (parts.length === 3) d = new Date(+parts[2], +parts[1]-1, +parts[0]);
+  else d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+// Días hábiles entre dos fechas DD/MM/YYYY
+function businessDaysBetween(d1Str, d2Str) {
+  if (!d1Str || !d2Str) return '';
+  const parse = s => { const p = s.split('/'); return new Date(+p[2],+p[1]-1,+p[0]); };
+  let d1 = parse(d1Str), d2 = parse(d2Str);
+  if (isNaN(d1) || isNaN(d2)) return '';
+  let count = 0, cur = new Date(d1);
+  while (cur < d2) {
+    cur.setDate(cur.getDate()+1);
+    if (cur.getDay() !== 0 && cur.getDay() !== 6) count++;
+  }
+  return count;
+}
+
+// Normaliza cualquier formato de fecha a DD/MM/YYYY
+function normalizeFecha(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  // YYYYMMDD (ej: 20260623)
+  if (/^\d{8}$/.test(s)) {
+    return `${s.slice(6,8)}/${s.slice(4,6)}/${s.slice(0,4)}`;
+  }
+  // DD/MM/YYYY ya está correcto
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const p = s.split('-');
+    return `${p[2].substring(0,2)}/${p[1]}/${p[0]}`;
+  }
+  // DD/MM/YYYY HH:MM:SS
+  if (/^\d{2}\/\d{2}\/\d{4} /.test(s)) return s.split(' ')[0];
+  return s;
+}
+
+// Mes-Año desde fecha DD/MM/YYYY
+function mesAnioFromFecha(fechaStr) {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('/');
+  if (parts.length < 3) return '';
+  const d = new Date(+parts[2], +parts[1]-1, +parts[0]);
+  if (isNaN(d)) return '';
+  const mes = MESES_ES[d.getMonth()];
+  return `${mes.charAt(0).toUpperCase()+mes.slice(1,3)}-${String(d.getFullYear()).slice(-2)}`;
+}
+
+function buildKPIRows() {
+  if (!registroData.length) return [];
+
+  // Agrupar por ORD + DOCUMENTO (cada combinación = una fila KPI)
+  const groups = {};
+  registroData.forEach(r => {
+    const ord = rCol(r, ['ORD','ORDEN']);
+    const doc = rCol(r, ['DOCUMENTO','DOCUMENT']);
+    const key = ord + '||' + doc;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+
+  return Object.values(groups).map(rows => {
+    const first    = rows[0];
+    const fechaRec = normalizeFecha(rCol(first, ['INGRESO','FECHA INGRESO','FECHA RECEPCION','INGRESO']));
+    const fechaNI  = nextBusinessDay(fechaRec);
+    const leadTime = businessDaysBetween(fechaRec, fechaNI);
+    // Cantidad por Bulto = suma de QUANTITY según DOCUMENTO
+    const cantBulto = rows.reduce((s, r) => {
+      const q = parseFloat(rCol(r, ['QUANTITY','CANT.','CANT','CANTIDAD']) || '0');
+      return s + (isNaN(q) ? 0 : q);
+    }, 0);
+    const cantRecepcionada = rCol(first, ['INGRESO CANTIDAD','CANT RECEPCIONADA','INGRESO']) || cantBulto;
+
+    return {
+      'MES - AÑO':              mesAnioFromFecha(fechaRec),
+      'Cliente':                rCol(first, ['PROVEEDOR','CLIENTE','PROVIDER','CLIENTE']),
+      'Documento de Ingreso':   rCol(first, ['ORD','ORDEN']),
+      'Número Guía':            rCol(first, ['DOCUMENTO','DOCUMENT']),
+      'Tipo de Recepción':      'INGRESOS - COMPRA LOCAL',
+      'Fecha de Recepción':     fechaRec,
+      'Fecha de Emisión NI':    fechaNI,
+      'Lead Time':              leadTime,
+      'Cumplimiento de Ingreso (NI)': 1,
+      'Indicador Ácido':        1,
+      'Estatus de Cumplimiento':'CUMPLIDO',
+      'Responsable':            'CUMPLIDO',
+      'Motivo':                 '-',
+      'Cantidad por Bulto':     cantBulto,
+      'Cantidad de Recepciones':1,
+      'Cantidad Recepcionada':  cantBulto,
+      'Análisis de Causa':      '-',
+      'Acciones Correctivas':   '-',
+      'Fecha de Ejecución':     '-',
+      'Responsable de Ejecución':'-',
+      'EO':                     'OB',
+    };
+  });
+}
+
+function renderKPI() {
+  kpiData = buildKPIRows();
+
+  // Poblar filtro mes
+  const meses = [...new Set(kpiData.map(r => r['MES - AÑO']).filter(Boolean))];
+  document.getElementById('kpiMesFilter').innerHTML =
+    '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
+
+  filterKPI();
+}
+
+function filterKPI() {
+  const mes     = (document.getElementById('kpiMesFilter').value     || '').toLowerCase();
+  const cliente = (document.getElementById('kpiClienteFilter').value || '').toLowerCase();
+  const ord     = (document.getElementById('kpiOrdFilter').value     || '').toLowerCase();
+  const doc     = (document.getElementById('kpiDocFilter').value     || '').toLowerCase();
+
+  kpiFiltered = kpiData.filter(r => {
+    if (mes     && (r['MES - AÑO']||'').toLowerCase() !== mes)                          return false;
+    if (cliente && !(r['Cliente']||'').toLowerCase().includes(cliente))                  return false;
+    if (ord     && !(r['Documento de Ingreso']||'').toLowerCase().includes(ord))         return false;
+    if (doc     && !(r['Número Guía']||'').toLowerCase().includes(doc))                  return false;
+    return true;
+  });
+
+  selectedKPIRows.clear(); updateKPIBulkBar();
+  renderKPITable(kpiFiltered);
+}
+
+function clearKPIFilters() {
+  ['kpiMesFilter','kpiClienteFilter','kpiOrdFilter','kpiDocFilter'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  filterKPI();
+}
+
+function renderKPITable(rows) {
+  const tbody = document.getElementById('kpiBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="22" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('kpiCount').textContent = '0 registros';
+    document.getElementById('kpiTotal').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const isSelected = selectedKPIRows.has(i);
+    const badge = v => `<span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${v}</span>`;
+    const green = v => `<span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-secondary/10 text-secondary">${v}</span>`;
+    const num   = v => `<span class="font-mono-data font-bold text-on-surface text-[13px]">${v}</span>`;
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected?'bg-blue-50':''}">
+      <td class="px-md py-sm"><input type="checkbox" class="kpi-row-cb rounded border-outline-variant text-primary cursor-pointer" ${isSelected?'checked':''} onchange="toggleKPIRow(${i},this)"/></td>
+      <td class="px-md py-sm">${badge(r['MES - AÑO']||'—')}</td>
+      <td class="px-md py-sm text-on-surface font-semibold text-[13px] max-w-[160px] truncate" title="${r['Cliente']}">${r['Cliente']||'—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${r['Documento de Ingreso']||'—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${r['Número Guía']||'—'}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[12px]">${r['Tipo de Recepción']}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${r['Fecha de Recepción']||'—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${r['Fecha de Emisión NI']||'—'}</td>
+      <td class="px-md py-sm text-right">${num(r['Lead Time'])}</td>
+      <td class="px-md py-sm text-right">${num(r['Cumplimiento de Ingreso (NI)'])}</td>
+      <td class="px-md py-sm text-right">${num(r['Indicador Ácido'])}</td>
+      <td class="px-md py-sm">${green(r['Estatus de Cumplimiento'])}</td>
+      <td class="px-md py-sm">${green(r['Responsable'])}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[12px]">${r['Motivo']}</td>
+      <td class="px-md py-sm text-right">${num(Number(r['Cantidad por Bulto']).toLocaleString('es-PE'))}</td>
+      <td class="px-md py-sm text-right">${num(r['Cantidad de Recepciones'])}</td>
+      <td class="px-md py-sm text-right">${num(Number(r['Cantidad Recepcionada']).toLocaleString('es-PE'))}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[12px]">${r['Análisis de Causa']}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[12px]">${r['Acciones Correctivas']}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${r['Fecha de Ejecución']}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[12px]">${r['Responsable de Ejecución']}</td>
+      <td class="px-md py-sm font-mono-data font-bold text-primary text-[12px]">${r['EO']}</td>
+    </tr>`;
+  }).join('');
+
+  const totalBulto = rows.reduce((s,r) => s + (Number(r['Cantidad por Bulto'])||0), 0);
+  document.getElementById('kpiCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('kpiTotal').textContent = 'Total Bultos: ' + totalBulto.toLocaleString('es-PE') + ' uds.';
+}
+
+function toggleKPIRow(idx, cb) {
+  if (cb.checked) selectedKPIRows.add(idx); else selectedKPIRows.delete(idx);
+  const ca = document.getElementById('kpiCheckAll');
+  ca.indeterminate = selectedKPIRows.size > 0 && selectedKPIRows.size < kpiFiltered.length;
+  ca.checked = selectedKPIRows.size === kpiFiltered.length && kpiFiltered.length > 0;
+  updateKPIBulkBar();
+}
+
+function toggleAllKPI(masterCb) {
+  selectedKPIRows.clear();
+  if (masterCb.checked) kpiFiltered.forEach((_,i) => selectedKPIRows.add(i));
+  document.querySelectorAll('.kpi-row-cb').forEach(cb => cb.checked = masterCb.checked);
+  updateKPIBulkBar();
+}
+
+function updateKPIBulkBar() {
+  const bar = document.getElementById('kpiBulkBar');
+  if (selectedKPIRows.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('kpiBulkCount').textContent =
+      selectedKPIRows.size + ' fila' + (selectedKPIRows.size > 1 ? 's':'') + ' seleccionada' + (selectedKPIRows.size > 1 ? 's':'');
+  } else { bar.classList.add('hidden'); }
+}
+
+function clearKPISelection() {
+  selectedKPIRows.clear();
+  document.querySelectorAll('.kpi-row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('kpiCheckAll');
+  if (ca) { ca.checked = false; ca.indeterminate = false; }
+  updateKPIBulkBar();
+}
+
+function exportKPI() {
+  const rows = kpiFiltered.length ? kpiFiltered : kpiData;
+  const hoy  = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  downloadXLSX(`KPI_Ingreso_${fecha}.xlsx`, rows, 'KPI Ingreso');
+}
+
+function exportKPISelected() {
+  const rows = [...selectedKPIRows].map(i => kpiFiltered[i]);
+  const hoy  = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  downloadXLSX(`KPI_Seleccion_${fecha}.xlsx`, rows, 'KPI Ingreso');
+}
+
+
+// ========== HORIZONTE (CSV público de Google Sheets) ==========
+// Fuente: hoja publicada como CSV. Columnas esperadas:
+// FECHA DE LLEGADA | PROVEEDOR | OC | HORA | CODIGOS | UNIDADES
+const HORIZONTE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQgn1Yp4-QseqM82ZqboVRImdNiFIx5kJLfO8ALa5nml7yqKSi9-HCWygRTHW932b7m06Jq2bG09QJA/pub?gid=1261767277&single=true&output=csv';
+
+let horizonteData = [];
+let horizonteFiltered = [];
+let horizonteSortCol = 'fecha';
+let horizonteSortDir = 1;
+let chartHorizonte = null;
+let horizonteCalMonth = new Date(); // mes actualmente mostrado en el calendario visual
+let horizonteFirstLoad = true; // controla si se aplica el rango de "esta semana" por defecto
+
+function dateToInputStr(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseFechaDDMMYYYY(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const parts = s.split('/');
+  if (parts.length !== 3) return null;
+  const d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function loadHorizonte() {
+  const tbody = document.getElementById('horizonteBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>';
+
+  Papa.parse(HORIZONTE_CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      horizonteData = (results.data || []).map(raw => {
+        const row = {};
+        Object.keys(raw).forEach(k => { row[k.trim().toUpperCase()] = raw[k]; });
+        const fechaStr = (row['FECHA DE LLEGADA'] || '').toString().trim();
+        const fechaObj = parseFechaDDMMYYYY(fechaStr);
+        return {
+          fecha:     fechaStr,
+          fechaObj:  fechaObj,
+          proveedor: (row['PROVEEDOR'] || '').toString().trim(),
+          oc:        (row['OC'] || '').toString().trim(),
+          hora:      (row['HORA'] || '').toString().trim(),
+          codigos:   parseFloat(String(row['CODIGOS']  || '').replace(/[^0-9.-]/g, '')) || 0,
+          unidades:  parseFloat(String(row['UNIDADES'] || '').replace(/[^0-9.-]/g, '')) || 0,
+        };
+      }).filter(r => r.fechaObj); // solo filas con fecha válida
+
+      if (horizonteFirstLoad) {
+        // Primera carga: por defecto se muestra el rango de esta semana (Lun-Dom)
+        horizonteFirstLoad = false;
+        setHorizontePreset('semana');
+      } else {
+        // Actualizaciones posteriores respetan los filtros que el usuario ya tenga puestos
+        filterHorizonte();
+      }
+    },
+    error: function(err) {
+      console.error(err);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-error">⚠️ Error al cargar Horizonte. Verifica que la hoja esté publicada como CSV.</td></tr>';
+    }
+  });
+}
+
+function setHorizontePreset(kind) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const toInput = dateToInputStr;
+  let desde = '', hasta = '';
+  if (kind === 'hoy') {
+    desde = toInput(hoy); hasta = toInput(hoy);
+  } else if (kind === 'semana') {
+    const dow = hoy.getDay() === 0 ? 7 : hoy.getDay(); // Lunes=1 ... Domingo=7
+    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (dow - 1));
+    const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
+    desde = toInput(lunes); hasta = toInput(domingo);
+  } else if (kind === 'mes') {
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const ultimo  = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    desde = toInput(primero); hasta = toInput(ultimo);
+  } else {
+    desde = ''; hasta = '';
+  }
+  document.getElementById('horDesde').value = desde;
+  document.getElementById('horHasta').value = hasta;
+  filterHorizonte();
+}
+
+function clearHorizonteFilters() {
+  // "Limpiar filtros" vuelve al rango de seguimiento semanal (Lun-Dom de esta semana),
+  // no a "todo": el filtro de fechas libre se reserva para consultas puntuales.
+  document.getElementById('horProveedor').value = '';
+  setHorizontePreset('semana');
+}
+
+function sortHorizonte(col) {
+  if (horizonteSortCol === col) horizonteSortDir *= -1;
+  else { horizonteSortCol = col; horizonteSortDir = 1; }
+  filterHorizonte();
+}
+
+function filterHorizonte() {
+  const desdeStr = document.getElementById('horDesde')?.value || '';
+  const hastaStr = document.getElementById('horHasta')?.value || '';
+  const prov = (document.getElementById('horProveedor')?.value || '').toLowerCase();
+
+  const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null;
+  const hasta = hastaStr ? new Date(hastaStr + 'T23:59:59') : null;
+
+  let rows = horizonteData.filter(r => {
+    if (desde && r.fechaObj < desde) return false;
+    if (hasta && r.fechaObj > hasta) return false;
+    if (prov && !r.proveedor.toLowerCase().includes(prov)) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let va, vb;
+    if (horizonteSortCol === 'fecha') { va = a.fechaObj; vb = b.fechaObj; }
+    else { va = a[horizonteSortCol]; vb = b[horizonteSortCol]; }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return -1 * horizonteSortDir;
+    if (va > vb) return  1 * horizonteSortDir;
+    return 0;
+  });
+
+  horizonteFiltered = rows;
+
+  // Actualizar flechas de orden en encabezados
+  ['fecha','proveedor','oc','hora','codigos','unidades'].forEach(c => {
+    const el = document.getElementById('hsort-' + c);
+    if (el) el.textContent = (c === horizonteSortCol) ? (horizonteSortDir === 1 ? '▲' : '▼') : '';
+  });
+
+  renderHorizonteTable(rows);
+  renderHorizonteChart(rows);
+  renderHorizonteCalendar();
+}
+
+function shiftHorizonteMonth(delta) {
+  horizonteCalMonth = new Date(horizonteCalMonth.getFullYear(), horizonteCalMonth.getMonth() + delta, 1);
+  renderHorizonteCalendar();
+}
+
+function selectHorizonteDay(iso) {
+  document.getElementById('horDesde').value = iso;
+  document.getElementById('horHasta').value = iso;
+  filterHorizonte();
+}
+
+function renderHorizonteCalendar() {
+  const label = document.getElementById('horCalLabel');
+  const grid  = document.getElementById('horCalGrid');
+  if (!label || !grid) return;
+
+  const year  = horizonteCalMonth.getFullYear();
+  const month = horizonteCalMonth.getMonth();
+  const mesCap = MESES_ES[month].charAt(0).toUpperCase() + MESES_ES[month].slice(1);
+  label.textContent = mesCap + ' ' + year;
+
+  // Suma de unidades por día (del dataset completo, no solo lo filtrado, para ver todo el mes)
+  const byDate = {};
+  horizonteData.forEach(r => {
+    if (r.fechaObj && r.fechaObj.getFullYear() === year && r.fechaObj.getMonth() === month) {
+      const key = r.fechaObj.getDate();
+      byDate[key] = (byDate[key] || 0) + r.unidades;
+    }
+  });
+
+  const desdeStr = document.getElementById('horDesde')?.value || '';
+  const hastaStr = document.getElementById('horHasta')?.value || '';
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7; // 0 = Lunes
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const hoyIso = dateToInputStr(new Date());
+
+  let cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push('<div></div>');
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(year, month, d);
+    const iso = dateToInputStr(dateObj);
+    const unidades = byDate[d];
+    const hasData = unidades != null;
+
+    let inRange = true;
+    if (desdeStr && iso < desdeStr) inRange = false;
+    if (hastaStr && iso > hastaStr) inRange = false;
+
+    const classes = ['rounded-lg','py-xs','text-[12px]','cursor-pointer','transition-all',
+      'flex','flex-col','items-center','justify-center','h-12','relative'];
+
+    if (hasData && inRange)      classes.push('font-bold text-on-tertiary-fixed-variant');
+    else if (hasData)            classes.push('bg-surface-container-high text-on-surface-variant font-semibold hover:bg-secondary-container/40');
+    else                          classes.push('text-on-surface-variant/50 hover:bg-surface-container-high');
+
+    if (iso === hoyIso) classes.push('ring-2 ring-primary ring-offset-1');
+
+    const style = (hasData && inRange) ? 'style="background:#fdbc13"' : '';
+    const unidadesLabel = hasData
+      ? (unidades >= 1000 ? (unidades/1000).toFixed(1) + 'k' : unidades.toLocaleString('es-PE'))
+      : '';
+
+    cells.push(`<div class="${classes.join(' ')}" ${style} onclick="selectHorizonteDay('${iso}')" title="${hasData ? unidades.toLocaleString('es-PE') + ' unidades' : 'Sin llegadas'}">
+      <span>${d}</span>
+      ${hasData ? `<span class="text-[9px] leading-none mt-0.5">${unidadesLabel}</span>` : ''}
+    </div>`);
+  }
+
+  grid.innerHTML = cells.join('');
+}
+
+function renderHorizonteTable(rows) {
+  const tbody = document.getElementById('horizonteBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('horizonteCount').textContent = '0 registros';
+    document.getElementById('horizonteTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm font-mono-data text-[12px] text-on-surface font-semibold whitespace-nowrap">${r.fecha || '—'}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[220px] truncate" title="${r.proveedor}">${r.proveedor || '—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${r.oc || '—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${r.hora || '—'}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.codigos.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.unidades.toLocaleString('es-PE')}</td>
+    </tr>
+  `).join('');
+
+  const totalUnidades = rows.reduce((s, r) => s + r.unidades, 0);
+  document.getElementById('horizonteCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('horizonteTotal').textContent = 'Total Unidades: ' + totalUnidades.toLocaleString('es-PE') + ' uds.';
+}
+
+// Paleta de 10 tonos (todos dentro de la familia del dorado/ámbar),
+// suficiente para hasta 10 proveedores por día.
+const HORIZONTE_PALETTE = [
+  '#fff3bf', '#ffe066', '#ffd43b', '#fcc419', '#fab005',
+  '#f59f00', '#e8a33d', '#d9822b', '#c76e00', '#a35700'
+];
+
+function renderHorizonteChart(rows) {
+  // Agrupar por fecha, y dentro de cada fecha por PROVEEDOR (sumando todas sus OC del día)
+  const porFecha = {};
+  rows.forEach(r => {
+    const fKey = r.fecha || '—';
+    if (!porFecha[fKey]) porFecha[fKey] = { fechaObj: r.fechaObj, porProveedor: {} };
+    const pKey = r.proveedor || '—';
+    if (!porFecha[fKey].porProveedor[pKey]) {
+      porFecha[fKey].porProveedor[pKey] = { proveedor: pKey, unidades: 0, ocs: [], horas: [] };
+    }
+    const g = porFecha[fKey].porProveedor[pKey];
+    g.unidades += r.unidades;
+    if (r.oc)   g.ocs.push(r.oc);
+    if (r.hora) g.horas.push(r.hora);
+  });
+
+  const fechas = Object.keys(porFecha).sort((a, b) => porFecha[a].fechaObj - porFecha[b].fechaObj);
+  fechas.forEach(f => {
+    porFecha[f].items = Object.values(porFecha[f].porProveedor).sort((a, b) => {
+      const ha = [...a.horas].sort()[0] || '';
+      const hb = [...b.horas].sort()[0] || '';
+      return ha.localeCompare(hb);
+    });
+  });
+
+  const maxProveedores = fechas.length
+    ? Math.min(10, Math.max(...fechas.map(f => porFecha[f].items.length)))
+    : 0;
+
+  // Etiqueta de 2 líneas: fecha arriba, cantidad de proveedores únicos abajo
+  const labels = fechas.map(f => {
+    const fo = porFecha[f].fechaObj;
+    const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : f;
+    const n = porFecha[f].items.length;
+    return [fechaCorta, `${n} proveedor${n !== 1 ? 'es' : ''}`];
+  });
+
+  // Un dataset por "posición" de proveedor dentro del día (1er proveedor, 2do, ...),
+  // cada uno con un tono distinto de la paleta dorada.
+  const datasets = [];
+  for (let i = 0; i < maxProveedores; i++) {
+    datasets.push({
+      label: 'Proveedor ' + (i + 1),
+      data: fechas.map(f => {
+        const item = porFecha[f].items[i];
+        return item ? item.unidades : null;
+      }),
+      _meta: fechas.map(f => porFecha[f].items[i] || null),
+      backgroundColor: HORIZONTE_PALETTE[i % HORIZONTE_PALETTE.length],
+      borderRadius: 4,
+      maxBarThickness: 36
+    });
+  }
+
+  const canvas = document.getElementById('horizonteChart');
+  const inner  = document.getElementById('horizonteChartInner');
+  if (!canvas) return;
+
+  // Ancho dinámico según cantidad de fechas y proveedores por día
+  if (inner) {
+    const anchoPorFecha = Math.max(maxProveedores * 26, 70);
+    const minWidthPx = Math.max(fechas.length * anchoPorFecha, 100);
+    inner.style.minWidth = fechas.length > 6 ? minWidthPx + 'px' : '100%';
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (chartHorizonte) chartHorizonte.destroy();
+  chartHorizonte = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#181c20',
+          titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' }, padding: 12,
+          callbacks: {
+            title: items => {
+              const it = items[0];
+              const meta = it.dataset._meta ? it.dataset._meta[it.dataIndex] : null;
+              return meta ? meta.proveedor : '';
+            },
+            label: ctx => {
+              const meta = ctx.dataset._meta ? ctx.dataset._meta[ctx.dataIndex] : null;
+              if (!meta) return 'Unidades: ' + (ctx.parsed.y ?? 0).toLocaleString('es-PE');
+              const lines = ['Unidades: ' + meta.unidades.toLocaleString('es-PE')];
+              if (meta.ocs.length)   lines.push('OC: ' + meta.ocs.join(', '));
+              if (meta.horas.length) lines.push('Hora: ' + [...new Set(meta.horas)].join(', '));
+              return lines;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#ebeef4', drawBorder: false },
+          ticks: { color: '#727785', font: { family: 'JetBrains Mono', size: 10 } }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#727785', font: { family: 'Inter', weight: '600', size: 10 }, autoSkip: false, maxRotation: 0, minRotation: 0 }
+        }
+      }
+    }
+  });
+}
+
+function exportHorizonte() {
+  const rows = (horizonteFiltered.length ? horizonteFiltered : horizonteData).map(r => ({
+    'FECHA DE LLEGADA': r.fecha,
+    'PROVEEDOR': r.proveedor,
+    'OC': r.oc,
+    'HORA': r.hora,
+    'CODIGOS': r.codigos,
+    'UNIDADES': r.unidades
+  }));
+  const hoy = new Date();
+  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
+  downloadXLSX(`Horizonte_${fecha}.xlsx`, rows, 'Horizonte');
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ghost-border').forEach(card => {
+    card.addEventListener('mouseenter', () => { card.style.transform = 'translateY(-2px)'; });
+    card.addEventListener('mouseleave', () => { card.style.transform = 'translateY(0)'; });
+  });
+  loadAllData();
+  loadHorizonte();
+});
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>IncomeControl - Resumen Anual</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-surface": "#181c20",
+          "inverse-primary": "#adc7ff",
+          "on-primary-container": "#ffffff",
+          "outline": "#727785",
+          "surface-dim": "#d7dae0",
+          "primary-fixed": "#d8e2ff",
+          "on-tertiary-fixed": "#261900",
+          "secondary": "#006d3a",
+          "inverse-surface": "#2d3135",
+          "background": "#f7f9ff",
+          "tertiary-fixed": "#ffdea3",
+          "surface-container-high": "#e5e8ee",
+          "on-secondary": "#ffffff",
+          "surface-container-low": "#f1f4fa",
+          "on-secondary-fixed-variant": "#00522b",
+          "on-tertiary": "#ffffff",
+          "error-container": "#ffdad6",
+          "surface-container-lowest": "#ffffff",
+          "on-tertiary-fixed-variant": "#5d4200",
+          "surface-variant": "#dfe3e8",
+          "tertiary-fixed-dim": "#fdbc13",
+          "secondary-container": "#7ff8a8",
+          "surface-container-highest": "#dfe3e8",
+          "secondary-fixed": "#82faab",
+          "error": "#ba1a1a",
+          "on-primary-fixed": "#001a41",
+          "surface-tint": "#005bc0",
+          "surface": "#f7f9ff",
+          "outline-variant": "#c1c6d6",
+          "on-tertiary-container": "#080400",
+          "tertiary-container": "#997000",
+          "on-error": "#ffffff",
+          "on-secondary-fixed": "#00210e",
+          "on-primary": "#ffffff",
+          "on-secondary-container": "#00723d",
+          "primary-container": "#1a73e8",
+          "primary": "#005bbf",
+          "tertiary": "#7a5800",
+          "on-error-container": "#93000a",
+          "on-background": "#181c20",
+          "primary-fixed-dim": "#adc7ff",
+          "secondary-fixed-dim": "#64dd91",
+          "inverse-on-surface": "#eef1f7",
+          "on-surface-variant": "#414754",
+          "surface-container": "#ebeef4",
+          "on-primary-fixed-variant": "#004493",
+          "surface-bright": "#f7f9ff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem","lg": "0.25rem","xl": "0.5rem","full": "0.75rem"
+        },
+        "spacing": {
+          "sm": "8px","grid-gutter": "16px","lg": "24px","md": "16px",
+          "xs": "4px","xl": "40px","base": "4px","grid-margin": "24px"
+        },
+        "fontFamily": {
+          "headline-sm": ["Inter"],"label-md": ["Inter"],"body-md": ["Inter"],
+          "headline-md-mobile": ["Inter"],"body-lg": ["Inter"],"headline-md": ["Inter"],
+          "mono-data": ["JetBrains Mono"],"body-sm": ["Inter"],"display-lg": ["Inter"]
+        },
+        "fontSize": {
+          "headline-sm": ["20px", {"lineHeight":"28px","fontWeight":"600"}],
+          "label-md": ["12px", {"lineHeight":"16px","letterSpacing":"0.05em","fontWeight":"600"}],
+          "body-md": ["14px", {"lineHeight":"20px","fontWeight":"400"}],
+          "headline-md-mobile": ["20px", {"lineHeight":"28px","fontWeight":"600"}],
+          "body-lg": ["16px", {"lineHeight":"24px","fontWeight":"400"}],
+          "headline-md": ["24px", {"lineHeight":"32px","letterSpacing":"-0.01em","fontWeight":"600"}],
+          "mono-data": ["13px", {"lineHeight":"16px","fontWeight":"500"}],
+          "body-sm": ["12px", {"lineHeight":"16px","fontWeight":"400"}],
+          "display-lg": ["36px", {"lineHeight":"44px","letterSpacing":"-0.02em","fontWeight":"700"}]
+        }
+      },
+    },
+  }
+</script>
+<style>
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    display: inline-block; vertical-align: middle; font-size: 18px;
+  }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .ghost-border { border: 1px solid #E0E3E7; }
+  @keyframes pulse-sync {
+    0% { transform: scale(0.95); opacity: 0.5; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.5; }
+  }
+  .sync-pulse { animation: pulse-sync 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .nav-item { display: flex; align-items: center; gap: 16px; padding: 8px 16px; border-radius: 0.25rem; cursor: pointer; transition: all 0.15s; }
+  .nav-item:hover { background-color: #e5e8ee; }
+  .nav-item.active { background-color: #7ff8a8; color: #00723d; font-weight: 600; }
+  .section-content { display: none; }
+  .section-content.active { display: block; }
+  /* Registro form styles */
+  .form-label { font-size: 10px; font-weight: 700; color: #414754; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: block; }
+  .form-input { width: 100%; background: #f7f9ff; border: 1px solid #c1c6d6; border-radius: 0.25rem; font-size: 14px; padding: 6px 10px; }
+  .form-input:focus { outline: none; ring: 2px solid #005bbf; border-color: #005bbf; }
+  .skeleton { background: linear-gradient(90deg, #e5e8ee 25%, #f1f4fa 50%, #e5e8ee 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+</style>
+</head>
+<body class="bg-surface font-body-md text-on-surface">
+
+<!-- SideNavBar -->
+<aside class="h-full w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col h-screen py-lg px-md z-50">
+  <div class="mb-xl flex items-center gap-md">
+    <div>
+      <h1 class="font-headline-md text-headline-md font-bold text-on-surface">Control de ingreso</h1>
+      <p class="text-body-sm text-on-surface-variant leading-none">CLIENTE - 271</p>
+    </div>
+  </div>
+  <nav class="flex-1 space-y-xs">
+    <div class="nav-item active" onclick="showSection('panel')">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">dashboard</span>
+      <span class="font-label-md text-label-md">Panel</span>
+    </div>
+    <div class="nav-item" onclick="showSection('registro')">
+      <span class="material-symbols-outlined">edit_square</span>
+      <span class="font-label-md text-label-md">Registro</span>
+    </div>
+    <div class="nav-item" onclick="showSection('ticket')">
+      <span class="material-symbols-outlined">confirmation_number</span>
+      <span class="font-label-md text-label-md">Ticket</span>
+    </div>
+    <div class="nav-item" onclick="showSection('detalle')">
+      <span class="material-symbols-outlined">list_alt</span>
+      <span class="font-label-md text-label-md">Detalle</span>
+    </div>
+    <div class="nav-item" onclick="showSection('kpi')">
+      <span class="material-symbols-outlined">bar_chart_4_bars</span>
+      <span class="font-label-md text-label-md">KPI Ingreso</span>
+    </div>
+    <div class="nav-item" onclick="showSection('horizonte')">
+      <span class="material-symbols-outlined">calendar_month</span>
+      <span class="font-label-md text-label-md">Horizonte</span>
+    </div>
+  </nav>
+  <div class="mt-auto pt-lg">
+    <div class="mt-lg flex items-center gap-md p-sm bg-surface-container-lowest rounded-xl ghost-border">
+      <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">OB</div>
+      <div class="overflow-hidden">
+        <p class="font-label-md text-label-md truncate">Omar Bernales</p>
+        <p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Odan89</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant ml-auto">more_vert</span>
+    </div>
+  </div>
+</aside>
+
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-64 h-16 bg-surface border-b border-outline-variant z-40">
+  <div class="flex justify-between items-center px-grid-margin w-full h-full">
+    <div class="flex items-center gap-xl">
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
+        <input id="searchInput" class="pl-10 pr-md py-xs bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary w-64 text-body-md" placeholder="Buscar datos..." type="text" oninput="onSearchDebounced()"/>
+      </div>
+    </div>
+    <div class="flex items-center gap-lg">
+      <div class="flex items-center gap-sm px-md py-1 bg-secondary-container/30 rounded-full border border-secondary/20">
+        <div class="w-2 h-2 rounded-full bg-secondary sync-pulse"></div>
+        <span id="syncStatus" class="text-[11px] font-semibold text-on-secondary-container">Cargando...</span>
+      </div>
+      <div class="flex items-center gap-md">
+        <div class="relative">
+          <button id="notifBtn" onclick="toggleNotifPanel()" class="p-base hover:bg-surface-container-high rounded-full transition-colors relative">
+            <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+            <div id="notifDot" class="hidden absolute top-1 right-1 w-2 h-2 bg-error rounded-full border-2 border-surface"></div>
+          </button>
+
+          <!-- Notification Panel -->
+          <div id="notifPanel" class="hidden absolute right-0 top-12 w-[380px] bg-white rounded-xl border border-outline-variant shadow-xl z-[200] overflow-hidden">
+            <!-- Info de recepción -->
+            <div class="bg-gradient-to-br from-secondary to-secondary/80 px-lg py-md text-white">
+              <div class="flex items-center gap-sm mb-xs">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <h4 class="font-headline-sm text-headline-sm">1. Recepción de Mercadería</h4>
+              </div>
+            </div>
+            <div class="px-lg py-md space-y-sm border-b border-outline-variant">
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">schedule</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Horario</p>
+                  <p class="text-body-sm text-on-surface">L-V &nbsp;08:00 AM - 04:00 PM</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">inventory_2</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Condiciones</p>
+                  <p class="text-body-sm text-on-surface">Mercadería paletizada y segregada (a cargo de Kamill)</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">fact_check</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Proceso</p>
+                  <p class="text-body-sm text-on-surface">Revisión del 100% de unidades</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-sm">
+                <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">assignment_return</span>
+                <div>
+                  <p class="text-[11px] font-bold text-on-surface-variant uppercase">Devoluciones</p>
+                  <p class="text-body-sm text-on-surface">Lead time de hasta 72 horas</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alertas de stock pendiente -->
+            <div class="px-lg py-sm bg-surface-container-low/60 flex items-center gap-sm">
+              <span class="material-symbols-outlined text-error text-[16px]">warning</span>
+              <span class="font-label-md text-label-md text-on-surface-variant uppercase">OC con códigos pendientes de registrar</span>
+            </div>
+            <div id="notifPendingList" class="max-h-[220px] overflow-auto hide-scrollbar divide-y divide-outline-variant">
+              <div class="px-lg py-md text-center text-body-sm text-on-surface-variant">Cargando...</div>
+            </div>
+
+            <!-- Alertas de Lead Time por Ticket -->
+            <div class="px-lg py-sm bg-surface-container-low/60 flex items-center gap-sm border-t border-outline-variant">
+              <span class="material-symbols-outlined text-error text-[16px]">schedule</span>
+              <span class="font-label-md text-label-md text-on-surface-variant uppercase">Tickets con retraso (Lead Time)</span>
+            </div>
+            <div id="notifLeadTimeList" class="max-h-[220px] overflow-auto hide-scrollbar divide-y divide-outline-variant">
+              <div class="px-lg py-md text-center text-body-sm text-on-surface-variant">Cargando...</div>
+            </div>
+          </div>
+        </div>
+        <button class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+          <span class="material-symbols-outlined text-on-surface-variant">help_outline</span>
+        </button>
+      </div>
+      <div class="h-8 w-px bg-outline-variant"></div>
+      <button onclick="showSection('registro')" class="px-lg py-sm bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary-container active:scale-95 transition-all text-body-md">
+        Agregar Ingreso
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="ml-64 pt-16 min-h-screen">
+<div class="max-w-[1900px] mx-auto p-grid-margin">
+
+  <!-- ===== PANEL SECTION ===== -->
+  <div id="section-panel" class="section-content active">
+    <section class="mb-xl">
+      <div class="flex justify-between items-end mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Panel de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Datos sincronizados desde Google Sheets</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">refresh</span> Actualizar
+          </button>
+          <button onclick="exportPanel()" class="flex items-center gap-sm px-md py-sm bg-surface-container-lowest ghost-border rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">download</span> Exportar
+          </button>
+        </div>
+      </div>
+
+      <!-- Monthly KPI Cards -->
+      <div id="kpiGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-grid-gutter">
+        <!-- Skeletons while loading -->
+        <script>for(let i=0;i<12;i++) document.write('<div class="bg-surface-container-lowest p-md rounded-xl ghost-border"><div class="skeleton h-4 w-16 mb-sm"></div><div class="skeleton h-6 w-12 mb-xs"></div><div class="skeleton h-6 w-14"></div></div>');</script>
+      </div>
+    </section>
+
+    <!-- Charts + Table -->
+    <div class="grid grid-cols-12 gap-grid-gutter">
+      <!-- Income Trend Chart -->
+      <section class="col-span-12 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+        <div class="flex justify-between items-center mb-xl">
+          <div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface">Tendencias de Ingresos (Anual)</h4>
+            <p class="text-body-sm text-on-surface-variant">Visualización de proveedores y unidades ingresadas por mes</p>
+          </div>
+          <div class="flex items-center gap-lg">
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full bg-[#005bbf]"></div>
+              <span class="text-body-sm font-semibold">Unidades</span>
+            </div>
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full border-2 border-[#006d3a] bg-white"></div>
+              <span class="text-body-sm font-semibold">Proveedores</span>
+            </div>
+          </div>
+        </div>
+        <div class="h-80 w-full mb-md px-md">
+          <canvas id="incomeTrendChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Recent Detalle Table in Panel -->
+      <section class="col-span-12 bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="px-lg py-md border-b border-outline-variant flex justify-between items-center">
+          <div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface">Detalle de Ingresos</h4>
+            <p class="text-body-sm text-on-surface-variant">Todos los registros ordenados del más reciente al primero</p>
+          </div>
+          <div class="flex gap-md">
+            <button onclick="exportPanelTable()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+              <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
+            </button>
+            <button onclick="showSection('detalle')" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-all">
+              Ir a Detalle <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+        <!-- Filters (no afectan gráfico ni KPIs) -->
+        <div class="px-lg py-md bg-surface-container-low/40 border-b border-outline-variant grid grid-cols-1 md:grid-cols-3 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="panelMesFilter" onchange="filterPanelTable()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Documento</label>
+            <input id="panelDocFilter" oninput="filterPanelTableDebounced()" class="form-input" placeholder="Ej: T001-0007571" type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Material</label>
+            <input id="panelMatFilter" oninput="filterPanelTableDebounced()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
+          </div>
+        </div>
+        <!-- Table -->
+        <div class="overflow-auto max-h-[480px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">CANTIDAD</th>
+              </tr>
+            </thead>
+            <tbody id="panelRecentTable" class="divide-y divide-outline-variant">
+              <tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="panelTableCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="panelTableTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===== REGISTRO SECTION ===== -->
+  <div id="section-registro" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Registro de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Vista completa de la hoja de Registro</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="document.getElementById('plantillaFileInput').click()" class="flex items-center gap-sm px-md py-sm bg-secondary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">upload_file</span> Cargar Plantilla
+          </button>
+          <input id="plantillaFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handlePlantillaUpload(event)"/>
+          <button onclick="downloadPlantillaVacia()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">file_download</span> Descargar Plantilla
+          </button>
+          <button onclick="exportRegistro()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLS
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal de confirmación de carga -->
+      <div id="plantillaModal" class="hidden fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-lg">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-lg">
+          <div class="flex items-center gap-sm mb-md">
+            <span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">Confirmar carga de plantilla</h3>
+          </div>
+          <p id="plantillaModalText" class="text-body-md text-on-surface-variant mb-lg">—</p>
+          <div class="flex justify-end gap-md">
+            <button onclick="closePlantillaModal()" class="px-md py-sm rounded-lg border border-outline-variant text-body-md hover:bg-surface-container-high transition-all">Cancelar</button>
+            <button onclick="confirmPlantillaUpload()" class="px-md py-sm rounded-lg bg-primary text-white font-semibold text-body-md hover:opacity-90 transition-all">Cargar datos</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearRegistroFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-5 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="registroMesFilter" onchange="filterRegistro()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Tipo</label>
+            <input id="registroTipoFilter" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar tipo..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Documento</label>
+            <input id="registroDocFilter" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar documento..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Estatus</label>
+            <select id="registroEstatusFilter" onchange="filterRegistro()" class="form-input">
+              <option value="">Todos los estatus</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Completado">Completado</option>
+              <option value="Error">Error</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Búsqueda general</label>
+            <input id="registroSearch" oninput="filterRegistroDebounced()" class="form-input" placeholder="Buscar en todo..." type="text"/>
+          </div>
+        </div>
+        <div id="registroFilterChips" class="hidden px-lg pb-md flex flex-wrap gap-xs"></div>
+      </div>
+
+      <!-- Bulk action bar -->
+      <div id="registroBulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="registroBulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportRegistroSelected()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar selección
+          </button>
+          <button onclick="clearRegistroSelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
+            <thead id="registroHead" class="bg-surface-container-low sticky top-0 z-10">
+              <tr><th class="px-md py-md font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
+            </thead>
+            <tbody id="registroBody" class="divide-y divide-outline-variant">
+              <tr><td class="px-md py-sm text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="registroCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="registroTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== TICKET SECTION ===== -->
+  <div id="section-ticket" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Ticket</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Resumen por ticket (ORD) agrupando la hoja de Registro</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportTicket()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearTicketFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="ticketMesFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Proveedor</label>
+            <input id="ticketProveedorFilter" oninput="filterTicketDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Estatus</label>
+            <select id="ticketEstatusFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Completado">Completado</option>
+              <option value="Revisar">Revisar</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Búsqueda general</label>
+            <input id="ticketBuscarFilter" oninput="filterTicketDebounced()" class="form-input" placeholder="Ticket, documento u OC..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Lead Time</label>
+            <select id="ticketLeadTimeFilter" onchange="filterTicket()" class="form-input">
+              <option value="">Todos</option>
+              <option value="red">Retraso en reporte</option>
+              <option value="amber">Pendiente (1 día)</option>
+              <option value="green">En tiempo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('mes')">MES <span class="material-symbols-outlined text-[12px]" id="ticketsort-mes">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ingreso')">INGRESO <span class="material-symbols-outlined text-[12px]" id="ticketsort-ingreso">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ticket')">TICKET <span class="material-symbols-outlined text-[12px]" id="ticketsort-ticket">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('recibida')">CANTIDAD RECIBIDA <span class="material-symbols-outlined text-[12px]" id="ticketsort-recibida">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('ingresada')">CANTIDAD INGRESADA <span class="material-symbols-outlined text-[12px]" id="ticketsort-ingresada">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('inicio')">INICIO <span class="material-symbols-outlined text-[12px]" id="ticketsort-inicio">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortTicket('termino')">TERMINO <span class="material-symbols-outlined text-[12px]" id="ticketsort-termino">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">ESTATUS</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LEAD TIME</th>
+              </tr>
+            </thead>
+            <tbody id="ticketBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="ticketCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="ticketTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== DETALLE SECTION ===== -->
+  <div id="section-detalle" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Detalle de Ingresos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Vista completa de materiales ingresados</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportDetalle()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearDetalleFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-5 gap-md">
+          <div>
+            <label class="form-label">Mes</label>
+            <select id="detalleMesFilter" onchange="filterDetalle()" class="form-input">
+              <option value="">Todos los meses</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Proveedor</label>
+            <select id="detalleProvFilter" onchange="onDetalleProvChange()" class="form-input">
+              <option value="">Todos los proveedores</option>
+            </select>
+          </div>
+          <div class="relative">
+            <label class="form-label">OC / Referente</label>
+            <button type="button" id="detalleOcDropdownBtn" onclick="toggleDetalleOcDropdown()" class="form-input text-left flex items-center justify-between gap-xs">
+              <span id="detalleOcDropdownLabel" class="truncate">Todos los OC</span>
+              <span class="material-symbols-outlined text-[16px] text-on-surface-variant">expand_more</span>
+            </button>
+            <div id="detalleOcDropdownPanel" class="hidden absolute z-20 mt-xs w-full max-h-72 overflow-hidden flex flex-col bg-white border border-outline-variant rounded-lg shadow-lg">
+              <div class="p-sm border-b border-outline-variant">
+                <input id="detalleOcSearchInput" type="text" placeholder="Buscar OC / referente..." oninput="renderDetalleOcOptions()" class="form-input text-[12px]"/>
+              </div>
+              <div id="detalleOcOptionsList" class="flex flex-col overflow-auto p-xs"></div>
+              <div class="flex justify-between px-sm py-xs border-t border-outline-variant bg-surface-container-lowest">
+                <button type="button" onclick="clearDetalleOcSelection()" class="text-[11px] text-primary font-semibold hover:underline">Limpiar</button>
+                <button type="button" onclick="closeDetalleOcDropdown()" class="text-[11px] text-primary font-semibold hover:underline">Listo</button>
+              </div>
+            </div>
+          </div>
+          <div class="relative">
+            <label class="form-label">Documento</label>
+            <button type="button" id="detalleDocDropdownBtn" onclick="toggleDetalleDocDropdown()" class="form-input text-left flex items-center justify-between gap-xs">
+              <span id="detalleDocDropdownLabel" class="truncate">Todos los documentos</span>
+              <span class="material-symbols-outlined text-[16px] text-on-surface-variant">expand_more</span>
+            </button>
+            <div id="detalleDocDropdownPanel" class="hidden absolute z-20 mt-xs w-full max-h-72 overflow-hidden flex flex-col bg-white border border-outline-variant rounded-lg shadow-lg">
+              <div class="p-sm border-b border-outline-variant">
+                <input id="detalleDocSearchInput" type="text" placeholder="Buscar documento..." oninput="renderDetalleDocOptions()" class="form-input text-[12px]"/>
+              </div>
+              <div id="detalleDocOptionsList" class="flex flex-col overflow-auto p-xs"></div>
+              <div class="flex justify-between px-sm py-xs border-t border-outline-variant bg-surface-container-lowest">
+                <button type="button" onclick="clearDetalleDocSelection()" class="text-[11px] text-primary font-semibold hover:underline">Limpiar</button>
+                <button type="button" onclick="closeDetalleDocDropdown()" class="text-[11px] text-primary font-semibold hover:underline">Listo</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Material</label>
+            <input id="detalleMtFilter" oninput="filterDetalleDebounced()" class="form-input" placeholder="Ej: 14-00000343" type="text"/>
+          </div>
+        </div>
+        <!-- Active filter chips -->
+        <div id="filterChips" class="hidden px-lg pb-md flex flex-wrap gap-xs"></div>
+      </div>
+
+      <!-- Bulk action bar (shown when rows selected) -->
+      <div id="bulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="bulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportSelected()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar selección
+          </button>
+          <button onclick="clearSelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md w-10">
+                  <input id="checkAll" type="checkbox" onchange="toggleAllRows(this)" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"/>
+                </th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('mes')">MES <span class="material-symbols-outlined text-[12px]" id="sort-mes">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('fecha')">FECHA <span class="material-symbols-outlined text-[12px]" id="sort-fecha">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('oc')">OC <span class="material-symbols-outlined text-[12px]" id="sort-oc">unfold_more</span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">PROVEEDOR</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOCUMENTO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MATERIAL</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DESCRIPCIÓN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EAN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LOTE</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EXPIRA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer hover:text-primary select-none" onclick="sortDetalle('qty')">CANTIDAD <span class="material-symbols-outlined text-[12px]" id="sort-qty">unfold_more</span></th>
+              </tr>
+            </thead>
+            <tbody id="detalleBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="detalleCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="detalleTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== KPI INGRESO SECTION ===== -->
+  <div id="section-kpi" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">KPI Ingreso</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Indicadores de cumplimiento basados en la hoja de Registro</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadAllData()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportKPI()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearKPIFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Mes - Año</label>
+            <select id="kpiMesFilter" onchange="filterKPI()" class="form-input">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Cliente (Proveedor)</label>
+            <input id="kpiClienteFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Documento de Ingreso</label>
+            <input id="kpiOrdFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar ORD..." type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Número Guía</label>
+            <input id="kpiDocFilter" oninput="filterKPIDebounced()" class="form-input" placeholder="Buscar documento..." type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk bar -->
+      <div id="kpiBulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="kpiBulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportKPISelected()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar selección
+          </button>
+          <button onclick="clearKPISelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md w-10"><input id="kpiCheckAll" type="checkbox" onchange="toggleAllKPI(this)" class="rounded border-outline-variant text-primary cursor-pointer"/></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">MES - AÑO</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Cliente</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Doc. Ingreso</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Número Guía</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Tipo Recepción</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Fecha Recepción</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Fecha Emisión NI</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Lead Time</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Cumpl. NI</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Ind. Ácido</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Estatus</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Responsable</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Motivo</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Cant. Bulto</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Cant. Recepciones</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">Cant. Recepcionada</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Análisis Causa</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Acciones Correctivas</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Fecha Ejecución</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Resp. Ejecución</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">EO</th>
+              </tr>
+            </thead>
+            <tbody id="kpiBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="22" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="kpiCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="kpiTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== HORIZONTE SECTION ===== -->
+  <div id="section-horizonte" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Horizonte</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Próximas llegadas — fuente: Google Sheets (CSV público)</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadHorizonte()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportHorizonte()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm flex-wrap">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <div class="flex gap-xs ml-md flex-wrap">
+            <button onclick="setHorizontePreset('hoy')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Hoy</button>
+            <button onclick="setHorizontePreset('semana')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Esta semana</button>
+            <button onclick="setHorizontePreset('mes')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Este mes</button>
+            <button onclick="setHorizontePreset('todo')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Todo</button>
+          </div>
+          <button onclick="clearHorizonteFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Desde</label>
+            <input id="horDesde" type="date" onchange="filterHorizonte()" class="form-input"/>
+          </div>
+          <div>
+            <label class="form-label">Hasta</label>
+            <input id="horHasta" type="date" onchange="filterHorizonte()" class="form-input"/>
+          </div>
+          <div class="md:col-span-2">
+            <label class="form-label">Proveedor / Cliente</label>
+            <input id="horProveedor" oninput="filterHorizonteDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendario + Chart -->
+      <div class="grid grid-cols-12 gap-grid-gutter mb-md">
+        <!-- Calendario visual -->
+        <section class="col-span-12 lg:col-span-4 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+          <div class="flex items-center justify-between mb-md">
+            <button onclick="shiftHorizonteMonth(-1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span id="horCalLabel" class="font-headline-sm text-headline-sm text-on-surface">—</span>
+            <button onclick="shiftHorizonteMonth(1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-on-surface-variant uppercase mb-xs">
+            <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+          </div>
+          <div id="horCalGrid" class="grid grid-cols-7 gap-1"></div>
+          <div class="flex items-center gap-md mt-md text-[11px] text-on-surface-variant">
+            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded" style="background:#fdbc13"></div> En rango</div>
+            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded bg-surface-container-high"></div> Fuera de rango</div>
+          </div>
+        </section>
+
+        <!-- Chart -->
+        <section class="col-span-12 lg:col-span-8 bg-surface-container-lowest p-lg rounded-xl ghost-border">
+          <div class="flex justify-between items-center mb-md">
+            <div>
+              <h4 class="font-headline-sm text-headline-sm text-on-surface">Unidades por día</h4>
+              <p class="text-body-sm text-on-surface-variant">Según el rango filtrado</p>
+            </div>
+            <div class="flex items-center gap-xs">
+              <div class="w-3 h-3 rounded-full" style="background:#fdbc13"></div>
+              <span class="text-body-sm font-semibold">Unidades</span>
+            </div>
+          </div>
+          <div class="h-72 w-full overflow-x-auto hide-scrollbar">
+            <div id="horizonteChartInner" class="h-full" style="min-width:100%;">
+              <canvas id="horizonteChart"></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[520px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('fecha')">Fecha de Llegada <span id="hsort-fecha" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('proveedor')">Proveedor / Cliente <span id="hsort-proveedor" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('oc')">OC <span id="hsort-oc" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('hora')">Hora <span id="hsort-hora" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('codigos')">Códigos <span id="hsort-codigos" class="text-primary"></span></th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('unidades')">Unidades <span id="hsort-unidades" class="text-primary"></span></th>
+              </tr>
+            </thead>
+            <tbody id="horizonteBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="horizonteCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="horizonteTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</main>
+
+<script>
+// ========== CONFIG ==========
+// Antes se leía vía CSV publicado + corsproxy.io (frágil, se bloqueaba seguido).
+// Ahora Registro y Detalle se leen directo desde el mismo Apps Script que ya
+// usamos para guardar (APPS_SCRIPT_URL), con ?action=registro / ?action=detalle.
+// Ya no se usa corsproxy.io en ningún punto de la carga de datos.
+
+// Debounce: espera a que el usuario pare de escribir antes de filtrar/re-renderizar
+// tablas grandes. Los selects (onchange) siguen siendo instantáneos; solo se debounced
+// las cajas de texto de búsqueda (oninput), que son las que disparaban un re-render
+// completo en cada tecla presionada.
+function debounce(fn, wait = 250) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+// Nota: las funciones filterRegistro, filterTicket, filterDetalle, filterPanelTable,
+// filterKPI, filterHorizonte y onSearch son "function" (hoisted), por eso se pueden
+// envolver aquí aunque estén declaradas más abajo en el archivo.
+const filterRegistroDebounced   = debounce(() => filterRegistro());
+const filterTicketDebounced     = debounce(() => filterTicket());
+const filterDetalleDebounced    = debounce(() => filterDetalle());
+const filterPanelTableDebounced = debounce(() => filterPanelTable());
+const filterKPIDebounced        = debounce(() => filterKPI());
+const filterHorizonteDebounced  = debounce(() => filterHorizonte());
+const onSearchDebounced         = debounce(() => onSearch());
+
+// Fetch de datos vía Apps Script (sin proxy externo, sin CORS).
+// Incluye timeout: si Google Apps Script no responde en 20s, se corta la
+// espera y se muestra un error claro en vez de dejar "Sincronizando..." para siempre.
+function fetchSheetData(action, timeoutMs = 20000) {
+  const url = APPS_SCRIPT_URL + '?action=' + action + '&_=' + Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { signal: controller.signal })
+    .then(resp => {
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error('Error de red (' + resp.status + ') al pedir ' + action);
+      return resp.json();
+    })
+    .then(data => {
+      if (data && data.error) throw new Error(data.error);
+      if (action === 'all') {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('Respuesta inesperada del servidor para ' + action + '.');
+        }
+        return data;
+      }
+      if (!Array.isArray(data)) throw new Error('Respuesta inesperada del servidor para ' + action + '.');
+      return data;
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        throw new Error('Tiempo de espera agotado (' + (timeoutMs / 1000) + 's) conectando con Google Sheets. Revisa tu conexión a internet o que el Apps Script esté desplegado y accesible.');
+      }
+      throw err;
+    });
+}
+
+// ========== CARGA DE PLANTILLA (REGISTRO) ==========
+// Columnas esperadas de la plantilla, de la B a la T (la A = ID IMPOR se autogenera)
+const PLANTILLA_COLS = [
+  'TIPO','MES','ORD','PROVEEDOR','REFERENTE','INGRESO','DOCUMENTO',
+  'Material Number','CODIGO','Article description','EAN 13','LOTE','EXPIRA',
+  'QUANTITY','STOCK','Customs code','LINEA','CONDICION','CONDICION 2'
+];
+
+// URL del Web App de Google Apps Script que escribe en el Google Sheet de Registro.
+// Debes desplegar el script (ver instrucciones) y pegar aquí la URL que te entregue.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxix3lzRb_tq8qMeh0fsHKf_tY-52ZFyBVtFGUzScFkeEAc_Q3N69yE4vp7O4pzGfUT1Q/exec';
+
+function downloadPlantillaVacia() {
+  const headers = ['ID IMPOR', ...PLANTILLA_COLS];
+  // Fila de ejemplo para que el usuario vea el formato correcto (se puede borrar)
+  const ejemplo = headers.map(h => {
+    if (h === 'Material Number') return "14-00000343"; // ejemplo con guión, ya como texto
+    if (h === 'QUANTITY') return 0;
+    if (h === 'STOCK') return ''; // se autocompleta = QUANTITY, no llenar manualmente
+    if (h === 'TIPO') return 'CL'; // siempre CL, se fuerza igual aunque lo cambies
+    if (h === 'MES') return ''; // se calcula automático desde INGRESO, no llenar manualmente
+    if (h === 'INGRESO') return '20250115'; // formato yyyymmdd
+    return '';
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo]);
+
+  // Columnas que deben quedar formateadas como TEXTO de fábrica para que Excel
+  // nunca interprete "14-00000343" como una fórmula de resta.
+  const TEXT_FORMAT_COLS = [
+    'Material Number','CODIGO','EAN 13','LOTE','ORD','REFERENTE',
+    'DOCUMENTO','Customs code','LINEA','INGRESO'
+  ];
+  headers.forEach((h, ci) => {
+    if (TEXT_FORMAT_COLS.includes(h)) {
+      // Aplica formato de texto (@) a toda la columna, filas 2 a 200, para uso futuro del usuario
+      for (let ri = 1; ri <= 200; ri++) {
+        const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+        if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+        ws[addr].z = '@'; // formato número = texto
+      }
+    }
+  });
+
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
+  XLSX.writeFile(wb, 'Plantilla_Registro.xlsx');
+
+  setTimeout(() => {
+    alert('📋 Plantilla descargada.\n\nIMPORTANTE:\n' +
+      '• La columna MATERIAL (F) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n' +
+      '• TIPO se guardará siempre como "CL", sin importar lo que escribas.\n' +
+      '• MES se calcula automáticamente a partir de INGRESO, no es necesario llenarlo.\n' +
+      '• INGRESO debe ir en formato AAAAMMDD (ej: 20250115), como texto.\n' +
+      '• STOCK se autocompleta siempre con el valor de QUANTITY, no es necesario llenarlo.\n\n' +
+      'Puedes borrar la fila de ejemplo antes de llenar tus datos.');
+  }, 300);
+}
+
+let pendingPlantillaRows = [];
+
+// Nombres de mes en español (mismo orden que MESES_ES más abajo, duplicado aquí
+// porque se usa antes de que se declare esa constante en el archivo).
+const MESES_ES_PLANTILLA = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+// Convierte INGRESO en formato AAAAMMDD (ej: "20250115") al nombre del mes en español.
+// Acepta también AAAA-MM-DD o AAAA/MM/DD por si el Excel lo formatea distinto.
+function mesFromIngresoYYYYMMDD(ingresoVal) {
+  const raw = String(ingresoVal || '').trim();
+  if (!raw) return '';
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (digits.length < 8) return '';
+  const mm = parseInt(digits.substring(4, 6), 10);
+  if (mm < 1 || mm > 12) return '';
+  return MESES_ES_PLANTILLA[mm - 1];
+}
+
+function handlePlantillaUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      // cellFormula:true permite recuperar el texto original si Excel evaluó "14-00000343" como fórmula de resta.
+      const wb = XLSX.read(data, { type: 'array', cellDates: false, cellText: true, cellFormula: true });
+      const firstSheet = wb.SheetNames[0];
+      const ws = wb.Sheets[firstSheet];
+
+      // Leer celda por celda. Si Excel interpretó "14-00000343" como una FÓRMULA
+      // de resta, el código original puede sobrevivir en cell.f (la fórmula).
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const aoa = [];
+      // Índice de columna F (MATERIAL) = 5 (A=0,B=1,C=2,D=3,E=4,F=5)
+      const MATERIAL_COL_INDEX = 5;
+      let materialCorrupted = false;
+
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        const row = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[addr];
+          if (!cell) { row.push(''); continue; }
+
+          let val;
+          if (cell.f) {
+            // Hay fórmula registrada: usar el texto de la fórmula tal cual (ej: "14-00000343")
+            val = cell.f;
+          } else if (c === MATERIAL_COL_INDEX && r > 0 && cell.t === 'n') {
+            // Es la columna MATERIAL, viene como número puro SIN fórmula guardada
+            // (Excel ya aplanó "14-00000343" a su resultado y perdió el texto original).
+            // No hay forma de recuperar el dato — se marca para avisar al usuario.
+            materialCorrupted = true;
+            val = String(cell.v);
+          } else if (cell.w !== undefined) {
+            val = cell.w;
+          } else {
+            val = cell.v !== undefined ? cell.v : '';
+          }
+          row.push(val);
+        }
+        aoa.push(row);
+      }
+
+      if (!aoa.length) { alert('El archivo está vacío.'); return; }
+
+      if (materialCorrupted) {
+        alert('⚠️ ATENCIÓN: Excel convirtió algunos códigos de MATERIAL en números (ej: "14-00000343" se perdió y quedó como un número).\n\n' +
+          'Esto ocurre cuando la columna F (MATERIAL) no está formateada como TEXTO en tu Excel.\n\n' +
+          'Para solucionarlo de forma permanente:\n' +
+          '1. Selecciona toda la columna F en tu plantilla\n' +
+          '2. Clic derecho → Formato de celdas → Texto\n' +
+          '3. Vuelve a escribir o pegar los códigos de MATERIAL\n' +
+          '4. Guarda y vuelve a cargar el archivo\n\n' +
+          'Continuando con la carga, pero algunos materiales pueden salir incorrectos.');
+      }
+
+      // Primera fila = encabezados de la plantilla (los ignoramos, usamos posición)
+      const dataRows = aoa.slice(1).filter(row => row.some(cell => String(cell).trim() !== ''));
+
+      if (!dataRows.length) { alert('No se encontraron filas de datos en la plantilla.'); return; }
+
+      // Columnas que SÍ son numéricas — todo lo demás se fuerza a texto plano
+      const NUMERIC_PLANTILLA_COLS = ['QUANTITY', 'STOCK'];
+
+      // Mapear columna B(index1) a T(index19) → PLANTILLA_COLS
+      pendingPlantillaRows = dataRows.map(row => {
+        const obj = {};
+        PLANTILLA_COLS.forEach((col, i) => {
+          // B=1, C=2 ... T=19 → offset +1 porque A=0 es ID IMPOR (se ignora del archivo)
+          let raw = row[i + 1] !== undefined ? row[i + 1] : '';
+          let val = String(raw).trim();
+          if (NUMERIC_PLANTILLA_COLS.includes(col)) {
+            // Entero limpio: sin decimales ni separador de miles
+            const n = parseInt(val.replace(/[^0-9-]/g,''), 10);
+            val = isNaN(n) ? '' : n;
+          }
+          // Para todo lo demás (EAN, ORD, REFERENTE, DOCUMENTO, LOTE, etc.) se conserva como texto plano,
+          // evitando que Excel/SheetJS lo interprete como número o notación científica.
+          obj[col] = val;
+        });
+        // TIPO siempre "CL", sin importar lo que venga en el archivo
+        obj['TIPO'] = 'CL';
+
+        // MES se calcula SIEMPRE desde INGRESO (formato AAAAMMDD), se ignora lo que venga en el archivo
+        obj['MES'] = mesFromIngresoYYYYMMDD(obj['INGRESO']);
+
+        // STOCK siempre igual a QUANTITY (se ignora lo que venga en el archivo)
+        obj['STOCK'] = obj['QUANTITY'] !== '' ? obj['QUANTITY'] : '';
+
+        // CONDICION 2 siempre LOTIZADO
+        obj['CONDICION 2'] = 'LOTIZADO';
+        return obj;
+      });
+
+      // Mostrar modal de confirmación
+      document.getElementById('plantillaModalText').innerHTML =
+        `Se detectaron <strong>${pendingPlantillaRows.length}</strong> fila(s) en el archivo <strong>${file.name}</strong>.<br><br>
+        Se asignará un ID IMPOR correlativo automático. Además:<br>
+        • TIPO se guardará como <strong>"CL"</strong><br>
+        • MES se calculará desde INGRESO (AAAAMMDD)<br>
+        • STOCK se igualará a QUANTITY<br>
+        • CONDICION 2 se completará con <strong>"LOTIZADO"</strong><br><br>
+        Los datos se guardarán directamente en tu Google Sheet de Registro. ¿Deseas continuar?`;
+      document.getElementById('plantillaModal').classList.remove('hidden');
+
+    } catch (err) {
+      console.error(err);
+      alert('Error al leer el archivo: ' + err.message);
+    }
+    event.target.value = ''; // reset input
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function closePlantillaModal() {
+  document.getElementById('plantillaModal').classList.add('hidden');
+  pendingPlantillaRows = [];
+}
+
+async function confirmPlantillaUpload() {
+  if (!pendingPlantillaRows.length) { closePlantillaModal(); return; }
+
+  const btn = document.querySelector('#plantillaModal button.bg-primary');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Cargando...';
+
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PEGA_AQUI')) {
+    alert('⚠️ Aún no se ha configurado la conexión con Google Sheets.\n\nPide al desarrollador que configure APPS_SCRIPT_URL para poder guardar los datos de forma permanente.');
+    btn.disabled = false; btn.innerHTML = originalText;
+    closePlantillaModal();
+    return;
+  }
+
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ rows: pendingPlantillaRows }),
+      redirect: 'follow'
+    });
+
+    if (!resp.ok) {
+      throw new Error('HTTP ' + resp.status);
+    }
+
+    const text = await resp.text();
+    let result;
+    try { result = JSON.parse(text); }
+    catch { throw new Error('Respuesta inválida del servidor: ' + text.substring(0,200)); }
+
+    if (result.ok) {
+      closePlantillaModal();
+      alert(`✅ ${result.inserted} registro(s) guardado(s) correctamente en Google Sheets.`);
+      await loadAllData(); // recarga datos reales desde el Sheet ya actualizado
+    } else {
+      throw new Error(result.error || 'Error desconocido');
+    }
+  } catch (err) {
+    console.error(err);
+    let msg = err.message;
+    if (msg.includes('Failed to fetch') || msg.includes('CORS')) {
+      msg = 'Bloqueo de CORS. Verifica que el Apps Script esté desplegado con acceso "Cualquier usuario" y que la implementación sea la más reciente (debes crear una NUEVA implementación cada vez que edites el script, no solo guardar).';
+    }
+    alert('❌ No se pudo guardar en Google Sheets:\n\n' + msg);
+  } finally {
+    btn.disabled = false; btn.innerHTML = originalText;
+  }
+}
+
+
+let detalleData = [];
+let registroFiltered = [];
+let detalleFiltered = [];
+let chartLine = null;
+
+// ========== NAV ==========
+function showSection(name) {
+  document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(name)) n.classList.add('active');
+  });
+}
+
+// ========== SEARCH (global, panel only) ==========
+function onSearch() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  if (q.length > 0) {
+    showSection('detalle');
+    // Selecciona (en el multi-select de Documento) todos los documentos que coincidan con la búsqueda
+    document.getElementById('detalleProvFilter').value = '';
+    refreshDetalleDocOptionsSource();
+    selectedDetalleDocs.clear();
+    detalleDocOptionsSource.filter(d => d.toLowerCase().includes(q)).forEach(d => selectedDetalleDocs.add(d));
+    renderDetalleDocOptions();
+    updateDetalleDocLabel();
+    filterDetalle();
+  }
+}
+
+// ========== LOAD DATA ==========
+async function loadAllData() {
+  document.getElementById('syncStatus').textContent = 'Sincronizando...';
+  try {
+    const all = await fetchSheetData('all');
+    if (all && !Array.isArray(all) && all.error) throw new Error(all.error);
+    const reg = all.registro || [];
+    const det = all.detalle  || [];
+
+    registroData = reg.map(r => ({ ...r, 'ESTATUS STOCK': calcEstatusStock(r) }));
+    detalleData  = det;
+    registroFiltered = [...reg];
+    detalleFiltered  = [...det];
+
+    const now = new Date();
+    document.getElementById('syncStatus').textContent = 'Sincronizado: ' + now.toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit'});
+
+    renderRegistro();
+    renderTicket();
+    renderDetalle();
+    renderPanel();
+    renderKPI();
+    renderNotifications();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('syncStatus').textContent = 'Error al cargar datos';
+    const errHtml = '⚠️ Error al cargar: ' + e.message + '<br><small>Verifica tu conexión a internet o que el Apps Script esté publicado correctamente.</small>';
+
+    document.getElementById('panelRecentTable').innerHTML =
+      '<tr><td colspan="7" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const regBody = document.getElementById('registroBody');
+    if (regBody) regBody.innerHTML = '<tr><td class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const ticketBody = document.getElementById('ticketBody');
+    if (ticketBody) ticketBody.innerHTML = '<tr><td colspan="12" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+
+    const detBody = document.getElementById('detalleBody');
+    if (detBody) detBody.innerHTML = '<tr><td colspan="12" class="px-lg py-lg text-center text-error">' + errHtml + '</td></tr>';
+  }
+}
+
+// ========== HELPERS ==========
+// Mapeo exacto de columnas del Sheet de Detalle:
+// REGISTRO → fecha/datetime  |  REFERENTE → OC  |  ORD → orden
+// DOCUMENTO → documento      |  MATERIAL NUMBER → material
+// ARTICLE DESCRIPTION → descripción  |  CANT. → cantidad
+// COD-EAN / EAN-CODE → ean  |  LOTE → lote  |  EXPIRA → vencimiento
+
+// Calcula el estatus de la línea según STOCK vs QUANTITY.
+// Prioridad (de mayor a menor): Error > Completado > Pendiente > En proceso.
+// - STOCK < 0           -> "Error" (se descontó más de lo que había)
+// - STOCK == 0          -> "Completado"
+// - STOCK == QUANTITY   -> "Pendiente" (aún no se ha tocado el saldo)
+// - STOCK < QUANTITY     -> "En proceso"
+// - STOCK > QUANTITY     -> "Revisar" (caso no esperado, saldo mayor al original)
+function calcEstatusStock(row) {
+  const qtyRaw   = colVal(row, ['QUANTITY']);
+  const stockRaw = colVal(row, ['STOCK']);
+  const qty   = parseFloat(qtyRaw);
+  const stock = parseFloat(stockRaw);
+  if (isNaN(qty) || isNaN(stock)) return '';
+  if (stock < 0) return 'Error';
+  if (stock === 0) return 'Completado';
+  if (stock === qty) return 'Pendiente';
+  if (stock < qty) return 'En proceso';
+  return 'Revisar';
+}
+
+// Cache de claves normalizadas por fila (misma prioridad de coincidencia que antes,
+// solo evita recalcular trim()/toUpperCase() de todas las columnas en cada llamada).
+const _rowKeyPairsCache = new WeakMap();
+function _getKeyPairs(row) {
+  let pairs = _rowKeyPairsCache.get(row);
+  if (!pairs) {
+    pairs = Object.keys(row).map(k => ({ k, kn: k.trim().toUpperCase() }));
+    _rowKeyPairsCache.set(row, pairs);
+  }
+  return pairs;
+}
+
+function colVal(row, names) {
+  if (!row || typeof row !== 'object') return '';
+  const pairs = _getKeyPairs(row);
+  const namesUpper = names.map(n => n.toUpperCase());
+  // Exact match first
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn === nu) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+    }
+  }
+  // Fallback: includes
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn.includes(nu)) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+    }
+  }
+  return '';
+}
+
+// Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS), cacheado por fila
+const _mesFromRegistroCache = new WeakMap();
+function getMesFromRegistro(row) {
+  if (_mesFromRegistroCache.has(row)) return _mesFromRegistroCache.get(row);
+  const reg = colVal(row, ['REGISTRO']);
+  let mes = '';
+  if (reg) {
+    let d;
+    const parts = reg.split(/[\s\/\-:]/);
+    if (reg.includes('/')) {
+      d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+    } else {
+      d = new Date(reg);
+    }
+    if (!isNaN(d)) mes = MESES_ES[d.getMonth()];
+  }
+  _mesFromRegistroCache.set(row, mes);
+  return mes;
+}
+
+function getMesIndexFromRow(row) {
+  return MESES_ES.indexOf(getMesFromRegistro(row));
+}
+
+function getCantidad(row) {
+  // Columna exacta: "CANT."
+  const v = colVal(row, ['CANT.', 'CANT', 'QUANTITY', 'CANTIDAD']);
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MESES_SHORT = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
+function getMesIndex(mesStr) {
+  if (!mesStr) return -1;
+  const m = mesStr.toLowerCase().trim();
+  return MESES_ES.findIndex(me => me.startsWith(m.substring(0,3)));
+}
+
+// ========== RENDER REGISTRO ==========
+const selectedRegistroRows = new Set();
+let registroSortCol = null, registroSortDir = 1;
+let registroKeys = [];
+
+function renderRegistro() {
+  if (!registroData.length) return;
+  // Columnas del Sheet que no se muestran en la tabla de Registro.
+  // OJO: comparación EXACTA (no "includes") para no ocultar también "ESTATUS STOCK".
+  const HIDDEN_REGISTRO_COLS = ['ID IMPOR','REGISTRO','ESTATUS','CANT','UBIC DESTINO','USUARIO','NOM_USUARIO','EQUIPO','IMAGEN','CUSTOMS CODE','LINEA','CONDICION'];
+  registroKeys = Object.keys(registroData[0])
+    .filter(k => !HIDDEN_REGISTRO_COLS.includes(k.trim().toUpperCase()));
+
+  // Mes filter — busca columna MES
+  const mesKey = registroKeys.find(k => k.trim().toUpperCase() === 'MES') ||
+                 registroKeys.find(k => k.toLowerCase().includes('mes')) || '';
+  const meses = mesKey
+    ? MESES_ES.filter(m => registroData.some(r => String(r[mesKey]||'').toLowerCase().includes(m.substring(0,3))))
+    : [];
+  const selReg = document.getElementById('registroMesFilter');
+  selReg.innerHTML = '<option value="">Todos los meses</option>' +
+    meses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('');
+  selReg.dataset.mesKey = mesKey;
+
+  // Build sortable header with checkbox
+  const sortableKeys = ['MES','TIPO','ORD','REFERENTE','INGRESO','DOCUMENTO','MATERIAL NUMBER','CANTIDAD','CANT.','ESTATUS STOCK'];
+  document.getElementById('registroHead').innerHTML = '<tr>' +
+    `<th class="px-md py-md w-10"><input id="regCheckAll" type="checkbox" onchange="toggleAllRegistroRows(this)" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"/></th>` +
+    registroKeys.map(k => {
+      const sortable = sortableKeys.some(s => k.toUpperCase().includes(s));
+      return `<th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap ${sortable?'cursor-pointer hover:text-primary select-none':''}" ${sortable?`onclick="sortRegistro('${k}')"`:''}>${k.toUpperCase()}${sortable?` <span class="material-symbols-outlined text-[12px]" id="regsort-${k.replace(/[^a-z0-9]/gi,'_')}">unfold_more</span>`:''}</th>`;
+    }).join('') + '</tr>';
+
+  filterRegistro();
+}
+
+function clearRegistroFilters() {
+  ['registroMesFilter','registroTipoFilter','registroDocFilter','registroEstatusFilter','registroSearch'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterRegistro();
+}
+
+function filterRegistro() {
+  const mesKey = document.getElementById('registroMesFilter').dataset.mesKey || '';
+  const mes  = document.getElementById('registroMesFilter').value.toLowerCase();
+  const tipo = (document.getElementById('registroTipoFilter')?.value || '').toLowerCase();
+  const doc  = (document.getElementById('registroDocFilter')?.value  || '').toLowerCase();
+  const estatus = document.getElementById('registroEstatusFilter')?.value || '';
+  const q    = document.getElementById('registroSearch').value.toLowerCase();
+
+  registroFiltered = registroData.filter(r => {
+    if (estatus && r['ESTATUS STOCK'] !== estatus) return false;
+    if (mes && mesKey) {
+      if (!String(r[mesKey]||'').toLowerCase().includes(mes.substring(0,3))) return false;
+    }
+    if (tipo) {
+      const tipoKey = registroKeys.find(k => k.toLowerCase().includes('tipo')) || '';
+      if (tipoKey && !String(r[tipoKey]||'').toLowerCase().includes(tipo)) return false;
+    }
+    if (doc) {
+      const docKey = registroKeys.find(k => k.toLowerCase().includes('documento') || k.toLowerCase().includes('doc')) || '';
+      if (docKey && !String(r[docKey]||'').toLowerCase().includes(doc)) return false;
+    }
+    if (q) {
+      if (!Object.values(r).join(' ').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Update chips
+  const chips = document.getElementById('registroFilterChips');
+  const active = [
+    mes  ? `Mes: ${mes}`  : null,
+    tipo ? `Tipo: ${tipo}` : null,
+    doc  ? `Doc: ${doc}`   : null,
+    q    ? `Búsqueda: ${q}` : null,
+  ].filter(Boolean);
+  if (active.length) {
+    chips.classList.remove('hidden');
+    chips.innerHTML = active.map(t =>
+      `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">${t}</span>`
+    ).join('');
+  } else {
+    chips.classList.add('hidden'); chips.innerHTML = '';
+  }
+
+  selectedRegistroRows.clear();
+  updateRegistroBulkBar();
+  renderRegistroTable(registroFiltered);
+}
+
+function sortRegistro(col) {
+  if (registroSortCol === col) registroSortDir *= -1;
+  else { registroSortCol = col; registroSortDir = 1; }
+  document.querySelectorAll('[id^="regsort-"]').forEach(el => el.textContent = 'unfold_more');
+  const id = 'regsort-' + col.replace(/[^a-z0-9]/gi,'_');
+  const el = document.getElementById(id);
+  if (el) el.textContent = registroSortDir === 1 ? 'arrow_upward' : 'arrow_downward';
+
+  registroFiltered.sort((a, b) => {
+    const va = (a[col]||'').toString();
+    const vb = (b[col]||'').toString();
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) return (na - nb) * registroSortDir;
+    return va.localeCompare(vb) * registroSortDir;
+  });
+  selectedRegistroRows.clear(); updateRegistroBulkBar();
+  renderRegistroTable(registroFiltered);
+}
+
+function toggleRegistroRow(idx, cb) {
+  if (cb.checked) selectedRegistroRows.add(idx); else selectedRegistroRows.delete(idx);
+  const ca = document.getElementById('regCheckAll');
+  ca.indeterminate = selectedRegistroRows.size > 0 && selectedRegistroRows.size < registroFiltered.length;
+  ca.checked = selectedRegistroRows.size === registroFiltered.length && registroFiltered.length > 0;
+  updateRegistroBulkBar();
+}
+
+function toggleAllRegistroRows(masterCb) {
+  selectedRegistroRows.clear();
+  if (masterCb.checked) registroFiltered.forEach((_, i) => selectedRegistroRows.add(i));
+  document.querySelectorAll('.reg-row-cb').forEach(cb => cb.checked = masterCb.checked);
+  updateRegistroBulkBar();
+}
+
+function updateRegistroBulkBar() {
+  const bar = document.getElementById('registroBulkBar');
+  if (selectedRegistroRows.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('registroBulkCount').textContent =
+      selectedRegistroRows.size + ' fila' + (selectedRegistroRows.size > 1 ? 's' : '') + ' seleccionada' + (selectedRegistroRows.size > 1 ? 's' : '');
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearRegistroSelection() {
+  selectedRegistroRows.clear();
+  document.querySelectorAll('.reg-row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('regCheckAll');
+  if (ca) { ca.checked = false; ca.indeterminate = false; }
+  updateRegistroBulkBar();
+}
+
+function exportRegistroSelected() {
+  const rows = [...selectedRegistroRows].map(i => registroFiltered[i]);
+  downloadXLS('seleccion_registro.xls', rows, 'Registro');
+}
+
+function exportRegistro() {
+  downloadXLS('registro_ingresos.xls', registroFiltered, 'Registro');
+}
+
+// Columnas que se muestran con badge de color (tipo MES)
+const BADGE_COLS = ['MES'];
+// Columnas numéricas
+const NUM_COLS   = ['CANT.','CANT','CANTIDAD','QUANTITY','ORD'];
+
+function renderRegistroTable(rows) {
+  const tbody = document.getElementById('registroBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${registroKeys.length + 1}" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>`;
+    document.getElementById('registroCount').textContent = '0 registros';
+    if (document.getElementById('registroTotal')) document.getElementById('registroTotal').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const isSelected = selectedRegistroRows.has(i);
+    const cells = registroKeys.map(k => {
+      const v = r[k] || '';
+      const ku = k.trim().toUpperCase();
+      if (ku === 'ESTATUS STOCK') {
+        const estStyles = {
+          'PENDIENTE':  'bg-slate-100 text-slate-600',
+          'EN PROCESO': 'bg-amber-100 text-amber-700',
+          'COMPLETADO': 'bg-green-100 text-green-700',
+          'ERROR':      'bg-red-100 text-red-700',
+          'REVISAR':    'bg-purple-100 text-purple-700'
+        };
+        const cls = estStyles[String(v).toUpperCase()] || 'bg-gray-100 text-gray-600';
+        return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${v || '—'}</span></td>`;
+      }
+      if (BADGE_COLS.some(b => ku.includes(b))) {
+        const cap = String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase();
+        return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${cap || '—'}</span></td>`;
+      }
+      if (NUM_COLS.some(n => ku === n) && ku !== 'ORD') {
+        return `<td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(v||0).toLocaleString('es-PE')}</td>`;
+      }
+      // OC / REFERENTE style
+      if (ku === 'REFERENTE' || ku === 'ORD') {
+        return `<td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${v}</td>`;
+      }
+      // Material
+      if (ku === 'MATERIAL NUMBER' || ku === 'MATERIAL') {
+        return `<td class="px-md py-sm font-semibold text-body-md text-on-surface">${v}</td>`;
+      }
+      // Description truncate
+      if (ku.includes('DESCRIPTION') || ku.includes('ARTICLE') || ku.includes('DESC')) {
+        return `<td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${v}">${v}</td>`;
+      }
+      return `<td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${v}</td>`;
+    }).join('');
+
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}">
+      <td class="px-md py-sm">
+        <input type="checkbox" class="reg-row-cb rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" ${isSelected?'checked':''} onchange="toggleRegistroRow(${i}, this)"/>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('registroCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+}
+
+// ========== TICKET (resumen agrupado por ORD, a partir de Registro) ==========
+let ticketData = [];
+let ticketFiltered = [];
+let ticketSortCol = null, ticketSortDir = 1;
+
+// Estatus de un ticket según CANTIDAD RECIBIDA (suma QUANTITY) vs CANTIDAD INGRESADA (suma STOCK):
+// - ingresada == 0            -> "Completado"
+// - recibida == ingresada     -> "Pendiente"
+// - recibida > ingresada > 0  -> "En proceso"
+// - ingresada > recibida      -> "Revisar" (caso no esperado)
+function calcEstatusTicket(recibida, ingresada) {
+  if (ingresada === 0) return 'Completado';
+  if (recibida === ingresada) return 'Pendiente';
+  if (recibida > ingresada) return 'En proceso';
+  return 'Revisar';
+}
+
+// Lead Time del ticket: solo aplica si el ticket sigue "Pendiente" o "En proceso".
+// Se calcula contra la fecha INGRESO (fecha de llegada):
+// - >= 2 días desde INGRESO  -> "Retraso en reporte" (rojo)
+// - == 1 día desde INGRESO   -> "Pendiente" (ámbar)
+// - 0 días (mismo día)       -> "En tiempo" (verde)
+function calcLeadTimeStatus(estatus, ingresoStr) {
+  if (estatus !== 'Pendiente' && estatus !== 'En proceso') return { label: '—', level: 'none' };
+  if (!ingresoStr) return { label: '—', level: 'none' };
+  const p = ingresoStr.split('/');
+  if (p.length !== 3) return { label: '—', level: 'none' };
+  const ingresoDate = new Date(+p[2], +p[1] - 1, +p[0]);
+  if (isNaN(ingresoDate)) return { label: '—', level: 'none' };
+
+  const hoy = new Date();
+  const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const diffDias = Math.round((hoyMid - ingresoDate) / 86400000);
+
+  if (diffDias >= 2) return { label: 'Retraso en reporte', level: 'red', diffDias };
+  if (diffDias === 1) return { label: 'Pendiente', level: 'amber', diffDias };
+  return { label: 'En tiempo', level: 'green', diffDias };
+}
+
+// Agrupa registroData por ORD (ticket), usando REFERENTE como OC, INGRESO como
+// fecha de llegada, y REGISTRO (fecha/hora de cada fila) para inicio/término.
+function buildTicketData() {
+  const groups = {};
+  registroData.forEach(r => {
+    const ticket = colVal(r, ['ORD']);
+    if (!ticket) return; // se omiten filas sin ORD/ticket
+
+    if (!groups[ticket]) {
+      groups[ticket] = {
+        ticket,
+        mes: colVal(r, ['MES']) || getMesFromRegistro(r),
+        ingreso: normalizeFecha(colVal(r, ['INGRESO'])),
+        documento: colVal(r, ['DOCUMENTO']),
+        oc: colVal(r, ['REFERENTE']),
+        proveedor: colVal(r, ['PROVEEDOR']),
+        recibida: 0,
+        ingresada: 0,
+        inicio: null,
+        termino: null
+      };
+    }
+    const g = groups[ticket];
+    if (!g.documento) g.documento = colVal(r, ['DOCUMENTO']);
+    if (!g.oc)         g.oc = colVal(r, ['REFERENTE']);
+    if (!g.proveedor)  g.proveedor = colVal(r, ['PROVEEDOR']);
+    if (!g.mes)        g.mes = colVal(r, ['MES']) || getMesFromRegistro(r);
+    if (!g.ingreso)    g.ingreso = normalizeFecha(colVal(r, ['INGRESO']));
+
+    const qty   = parseFloat(colVal(r, ['QUANTITY']));
+    const stock = parseFloat(colVal(r, ['STOCK']));
+    g.recibida  += isNaN(qty)   ? 0 : qty;
+    g.ingresada += isNaN(stock) ? 0 : stock;
+
+    const fechaReg = colVal(r, ['REGISTRO']);
+    if (fechaReg) {
+      const d = new Date(fechaReg.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'));
+      if (!isNaN(d)) {
+        if (!g.inicio  || d < g.inicio)  g.inicio  = d;
+        if (!g.termino || d > g.termino) g.termino = d;
+      }
+    }
+  });
+
+  return Object.values(groups).map(g => {
+    const estatus = calcEstatusTicket(g.recibida, g.ingresada);
+    const lt = calcLeadTimeStatus(estatus, g.ingreso);
+    return { ...g, estatus, leadTime: lt.label, leadTimeLevel: lt.level };
+  });
+}
+
+function renderTicket() {
+  if (!registroData.length) return;
+  ticketData = buildTicketData();
+  ticketFiltered = [...ticketData];
+
+  const meses = MESES_ES.filter(m => ticketData.some(t => String(t.mes || '').toLowerCase().includes(m.substring(0, 3))));
+  const selMes = document.getElementById('ticketMesFilter');
+  if (selMes) {
+    selMes.innerHTML = '<option value="">Todos los meses</option>' +
+      meses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
+  }
+
+  filterTicket();
+}
+
+function clearTicketFilters() {
+  ['ticketMesFilter', 'ticketProveedorFilter', 'ticketEstatusFilter', 'ticketBuscarFilter', 'ticketLeadTimeFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterTicket();
+}
+
+function filterTicket() {
+  const mes = (document.getElementById('ticketMesFilter')?.value || '').toLowerCase();
+  const prov = (document.getElementById('ticketProveedorFilter')?.value || '').toLowerCase();
+  const estatus = document.getElementById('ticketEstatusFilter')?.value || '';
+  const q = (document.getElementById('ticketBuscarFilter')?.value || '').toLowerCase();
+  const leadTime = document.getElementById('ticketLeadTimeFilter')?.value || '';
+
+  ticketFiltered = ticketData.filter(t => {
+    if (mes && !String(t.mes || '').toLowerCase().includes(mes)) return false;
+    if (estatus && t.estatus !== estatus) return false;
+    if (leadTime && t.leadTimeLevel !== leadTime) return false;
+    if (prov && !String(t.proveedor || '').toLowerCase().includes(prov)) return false;
+    if (q) {
+      const hay = [t.ticket, t.documento, t.oc, t.proveedor].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (ticketSortCol) sortTicketRows();
+  renderTicketTable(ticketFiltered);
+}
+
+function sortTicket(col) {
+  if (ticketSortCol === col) ticketSortDir *= -1;
+  else { ticketSortCol = col; ticketSortDir = 1; }
+  document.querySelectorAll('[id^="ticketsort-"]').forEach(el => el.textContent = 'unfold_more');
+  const el = document.getElementById('ticketsort-' + col);
+  if (el) el.textContent = ticketSortDir === 1 ? 'arrow_upward' : 'arrow_downward';
+  sortTicketRows();
+  renderTicketTable(ticketFiltered);
+}
+
+function sortTicketRows() {
+  ticketFiltered.sort((a, b) => {
+    let va = a[ticketSortCol], vb = b[ticketSortCol];
+    if (va instanceof Date || vb instanceof Date) {
+      va = va ? va.getTime() : 0; vb = vb ? vb.getTime() : 0;
+      return (va - vb) * ticketSortDir;
+    }
+    if (typeof va === 'number' || typeof vb === 'number') {
+      return ((va || 0) - (vb || 0)) * ticketSortDir;
+    }
+    return String(va || '').localeCompare(String(vb || '')) * ticketSortDir;
+  });
+}
+
+const TICKET_ESTATUS_STYLES = {
+  'PENDIENTE':  'bg-slate-100 text-slate-600',
+  'EN PROCESO': 'bg-amber-100 text-amber-700',
+  'COMPLETADO': 'bg-green-100 text-green-700',
+  'REVISAR':    'bg-purple-100 text-purple-700'
+};
+
+const LEAD_TIME_STYLES = {
+  red:   'bg-red-100 text-red-700',
+  amber: 'bg-amber-100 text-amber-700',
+  green: 'bg-green-100 text-green-700',
+  none:  'bg-gray-100 text-gray-500'
+};
+
+function fmtFechaCorta(d) {
+  return d ? d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+}
+
+function renderTicketTable(rows) {
+  const tbody = document.getElementById('ticketBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    document.getElementById('ticketCount').textContent = '0 tickets';
+    document.getElementById('ticketTotal').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t => {
+    const mesCap = t.mes ? String(t.mes).charAt(0).toUpperCase() + String(t.mes).slice(1) : '—';
+    const cls = TICKET_ESTATUS_STYLES[String(t.estatus).toUpperCase()] || 'bg-gray-100 text-gray-600';
+    const ltCls = LEAD_TIME_STYLES[t.leadTimeLevel] || LEAD_TIME_STYLES.none;
+    return `<tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${t.ingreso || '—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.ticket || '—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${t.documento || '—'}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${t.oc || '—'}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[200px] truncate" title="${t.proveedor || ''}">${t.proveedor || '—'}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${t.recibida.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${t.ingresada.toLocaleString('es-PE')}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.inicio)}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${fmtFechaCorta(t.termino)}</td>
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${t.estatus || '—'}</span></td>
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${ltCls}">${t.leadTime || '—'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const totalRecibida = rows.reduce((s, t) => s + t.recibida, 0);
+  const totalIngresada = rows.reduce((s, t) => s + t.ingresada, 0);
+  document.getElementById('ticketCount').textContent = rows.length.toLocaleString('es-PE') + ' tickets';
+  document.getElementById('ticketTotal').textContent =
+    'Recibido: ' + totalRecibida.toLocaleString('es-PE') + ' / Ingresado: ' + totalIngresada.toLocaleString('es-PE');
+}
+
+function exportTicket() {
+  const rows = (ticketFiltered.length ? ticketFiltered : ticketData).map(t => ({
+    'MES': t.mes,
+    'INGRESO': t.ingreso,
+    'TICKET': t.ticket,
+    'DOCUMENTO': t.documento,
+    'OC': t.oc,
+    'PROVEEDOR': t.proveedor,
+    'CANTIDAD RECIBIDA': t.recibida,
+    'CANTIDAD INGRESADA': t.ingresada,
+    'INICIO': fmtFechaCorta(t.inicio),
+    'TERMINO': fmtFechaCorta(t.termino),
+    'ESTATUS': t.estatus,
+    'LEAD TIME': t.leadTime
+  }));
+  downloadXLSX(buildFilename(rows, 'Ticket'), rows, 'Ticket');
+}
+
+// ========== RENDER DETALLE ==========
+const selectedDetalleDocs = new Set(); // documentos seleccionados (multi-select)
+const selectedDetalleOcs  = new Set(); // OC/referentes seleccionados (multi-select)
+
+function renderDetalle() {
+  if (!detalleData.length) return;
+
+  // Populate mes filter — derived from REGISTRO date
+  const mesesSet = new Set();
+  detalleData.forEach(r => {
+    const m = getMesFromRegistro(r);
+    if (m) mesesSet.add(m);
+  });
+  // Sort by month order
+  const meses = MESES_ES.filter(m => mesesSet.has(m));
+  const selDet = document.getElementById('detalleMesFilter');
+  selDet.innerHTML = '<option value="">Todos</option>' + meses.map(m =>
+    `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
+
+  // Populate proveedor filter
+  const provSet = new Set();
+  detalleData.forEach(r => {
+    const p = colVal(r, ['PROVEEDOR']);
+    if (p) provSet.add(p);
+  });
+  const provList = [...provSet].sort((a, b) => a.localeCompare(b));
+  const selProv = document.getElementById('detalleProvFilter');
+  const prevProv = selProv.value;
+  selProv.innerHTML = '<option value="">Todos los proveedores</option>' + provList.map(p =>
+    `<option value="${p}">${p}</option>`).join('');
+  if (provList.includes(prevProv)) selProv.value = prevProv;
+
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
+  filterDetalle();
+}
+
+// Lista de documentos disponibles para el dropdown, dependiente del proveedor elegido
+let detalleDocOptionsSource = [];
+function refreshDetalleDocOptionsSource() {
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const base = prov
+    ? detalleData.filter(r => colVal(r, ['PROVEEDOR']).toLowerCase() === prov)
+    : detalleData;
+  const docSet = new Set();
+  base.forEach(r => {
+    const d = colVal(r, ['DOCUMENTO']);
+    if (d) docSet.add(d);
+  });
+  detalleDocOptionsSource = [...docSet].sort((a, b) => a.localeCompare(b));
+  // Quitar de la selección los documentos que ya no pertenecen al proveedor elegido
+  [...selectedDetalleDocs].forEach(d => {
+    if (!detalleDocOptionsSource.includes(d)) selectedDetalleDocs.delete(d);
+  });
+  renderDetalleDocOptions();
+  updateDetalleDocLabel();
+}
+
+// Lista de OC/Referentes disponibles para el dropdown, dependiente del proveedor elegido
+let detalleOcOptionsSource = [];
+function refreshDetalleOcOptionsSource() {
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const base = prov
+    ? detalleData.filter(r => colVal(r, ['PROVEEDOR']).toLowerCase() === prov)
+    : detalleData;
+  const ocSet = new Set();
+  base.forEach(r => {
+    const o = colVal(r, ['REFERENTE']);
+    if (o) ocSet.add(o);
+  });
+  detalleOcOptionsSource = [...ocSet].sort((a, b) => a.localeCompare(b));
+  // Quitar de la selección los OC que ya no pertenecen al proveedor elegido
+  [...selectedDetalleOcs].forEach(o => {
+    if (!detalleOcOptionsSource.includes(o)) selectedDetalleOcs.delete(o);
+  });
+  renderDetalleOcOptions();
+  updateDetalleOcLabel();
+}
+
+function onDetalleProvChange() {
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
+  filterDetalle();
+}
+
+function renderDetalleDocOptions() {
+  const list = document.getElementById('detalleDocOptionsList');
+  const q = (document.getElementById('detalleDocSearchInput')?.value || '').toLowerCase();
+  const opts = detalleDocOptionsSource.filter(d => d.toLowerCase().includes(q));
+  if (!opts.length) {
+    list.innerHTML = '<div class="px-sm py-sm text-[12px] text-on-surface-variant">Sin documentos</div>';
+    return;
+  }
+  list.innerHTML = opts.map(d => `
+    <label class="flex items-center gap-xs px-sm py-xs rounded-md hover:bg-surface-container-high cursor-pointer text-[12px]">
+      <input type="checkbox" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+        ${selectedDetalleDocs.has(d) ? 'checked' : ''} onchange="toggleDetalleDoc('${d.replace(/'/g,"\\'")}', this.checked)"/>
+      <span class="truncate">${d}</span>
+    </label>`).join('');
+}
+
+function toggleDetalleDoc(doc, checked) {
+  if (checked) selectedDetalleDocs.add(doc);
+  else selectedDetalleDocs.delete(doc);
+  updateDetalleDocLabel();
+  filterDetalle();
+}
+
+function updateDetalleDocLabel() {
+  const label = document.getElementById('detalleDocDropdownLabel');
+  const n = selectedDetalleDocs.size;
+  if (n === 0) label.textContent = 'Todos los documentos';
+  else if (n === 1) label.textContent = [...selectedDetalleDocs][0];
+  else label.textContent = `${n} documentos seleccionados`;
+}
+
+function toggleDetalleDocDropdown() {
+  const panel = document.getElementById('detalleDocDropdownPanel');
+  const opening = panel.classList.contains('hidden');
+  closeDetalleOcDropdown();
+  panel.classList.toggle('hidden');
+  if (opening) {
+    document.getElementById('detalleDocSearchInput').value = '';
+    renderDetalleDocOptions();
+    document.getElementById('detalleDocSearchInput').focus();
+  }
+}
+
+function closeDetalleDocDropdown() {
+  document.getElementById('detalleDocDropdownPanel').classList.add('hidden');
+}
+
+function clearDetalleDocSelection() {
+  selectedDetalleDocs.clear();
+  renderDetalleDocOptions();
+  updateDetalleDocLabel();
+  filterDetalle();
+}
+
+function renderDetalleOcOptions() {
+  const list = document.getElementById('detalleOcOptionsList');
+  const q = (document.getElementById('detalleOcSearchInput')?.value || '').toLowerCase();
+  const opts = detalleOcOptionsSource.filter(o => o.toLowerCase().includes(q));
+  if (!opts.length) {
+    list.innerHTML = '<div class="px-sm py-sm text-[12px] text-on-surface-variant">Sin OC / referentes</div>';
+    return;
+  }
+  list.innerHTML = opts.map(o => `
+    <label class="flex items-center gap-xs px-sm py-xs rounded-md hover:bg-surface-container-high cursor-pointer text-[12px]">
+      <input type="checkbox" class="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+        ${selectedDetalleOcs.has(o) ? 'checked' : ''} onchange="toggleDetalleOc('${o.replace(/'/g,"\\'")}', this.checked)"/>
+      <span class="truncate">${o}</span>
+    </label>`).join('');
+}
+
+function toggleDetalleOc(oc, checked) {
+  if (checked) selectedDetalleOcs.add(oc);
+  else selectedDetalleOcs.delete(oc);
+  updateDetalleOcLabel();
+  filterDetalle();
+}
+
+function updateDetalleOcLabel() {
+  const label = document.getElementById('detalleOcDropdownLabel');
+  const n = selectedDetalleOcs.size;
+  if (n === 0) label.textContent = 'Todos los OC';
+  else if (n === 1) label.textContent = [...selectedDetalleOcs][0];
+  else label.textContent = `${n} OC seleccionados`;
+}
+
+function toggleDetalleOcDropdown() {
+  const panel = document.getElementById('detalleOcDropdownPanel');
+  const opening = panel.classList.contains('hidden');
+  closeDetalleDocDropdown();
+  panel.classList.toggle('hidden');
+  if (opening) {
+    document.getElementById('detalleOcSearchInput').value = '';
+    renderDetalleOcOptions();
+    document.getElementById('detalleOcSearchInput').focus();
+  }
+}
+
+function closeDetalleOcDropdown() {
+  document.getElementById('detalleOcDropdownPanel').classList.add('hidden');
+}
+
+function clearDetalleOcSelection() {
+  selectedDetalleOcs.clear();
+  renderDetalleOcOptions();
+  updateDetalleOcLabel();
+  filterDetalle();
+}
+
+document.addEventListener('click', (e) => {
+  const docWrapper = document.getElementById('detalleDocDropdownBtn')?.parentElement;
+  if (docWrapper && !docWrapper.contains(e.target)) closeDetalleDocDropdown();
+  const ocWrapper = document.getElementById('detalleOcDropdownBtn')?.parentElement;
+  if (ocWrapper && !ocWrapper.contains(e.target)) closeDetalleOcDropdown();
+});
+
+function filterDetalle() {
+  const mes  = document.getElementById('detalleMesFilter').value.toLowerCase();
+  const prov = document.getElementById('detalleProvFilter').value.toLowerCase();
+  const mt   = document.getElementById('detalleMtFilter').value.toLowerCase();
+
+  detalleFiltered = detalleData.filter(r => {
+    const rowMes  = getMesFromRegistro(r).toLowerCase();
+    const rowProv = colVal(r, ['PROVEEDOR']).toLowerCase();
+    const rowOc   = colVal(r, ['REFERENTE']);
+    const rowDoc  = colVal(r, ['DOCUMENTO']);
+    const rowMat  = colVal(r, ['MATERIAL NUMBER']).toLowerCase();
+    if (mes  && rowMes !== mes) return false;
+    if (prov && rowProv !== prov) return false;
+    if (selectedDetalleOcs.size && !selectedDetalleOcs.has(rowOc)) return false;
+    if (selectedDetalleDocs.size && !selectedDetalleDocs.has(rowDoc)) return false;
+    if (mt   && !rowMat.includes(mt))  return false;
+    return true;
+  });
+
+  updateFilterChips({ mes, prov, mt });
+  selectedRows.clear();
+  updateBulkBar();
+  renderDetalleTable(detalleFiltered);
+}
+
+function clearDetalleFilters() {
+  ['detalleMesFilter','detalleProvFilter','detalleMtFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  selectedDetalleDocs.clear();
+  selectedDetalleOcs.clear();
+  refreshDetalleDocOptionsSource();
+  refreshDetalleOcOptionsSource();
+  filterDetalle();
+}
+
+function updateFilterChips(filters) {
+  const chips = document.getElementById('filterChips');
+  const labels = { mes:'Mes', prov:'Proveedor', mt:'Material' };
+  const active = Object.entries(filters).filter(([,v]) => v);
+  const docChips = [...selectedDetalleDocs].map(d =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      Documento: ${d}
+      <button onclick="removeDetalleDocChip('${d.replace(/'/g,"\\'")}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`);
+  const ocChips = [...selectedDetalleOcs].map(o =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      OC: ${o}
+      <button onclick="removeDetalleOcChip('${o.replace(/'/g,"\\'")}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`);
+  if (!active.length && !docChips.length && !ocChips.length) { chips.classList.add('hidden'); chips.innerHTML = ''; return; }
+  chips.classList.remove('hidden');
+  chips.innerHTML = active.map(([k, v]) =>
+    `<span class="inline-flex items-center gap-xs px-sm py-xs bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+      ${labels[k]}: ${v}
+      <button onclick="clearChip('${k}')" class="material-symbols-outlined text-[12px] hover:text-error">close</button>
+    </span>`
+  ).join('') + ocChips.join('') + docChips.join('');
+}
+
+function removeDetalleDocChip(doc) {
+  selectedDetalleDocs.delete(doc);
+  updateDetalleDocLabel();
+  renderDetalleDocOptions();
+  filterDetalle();
+}
+
+function removeDetalleOcChip(oc) {
+  selectedDetalleOcs.delete(oc);
+  updateDetalleOcLabel();
+  renderDetalleOcOptions();
+  filterDetalle();
+}
+
+function clearChip(key) {
+  const map = { mes:'detalleMesFilter', prov:'detalleProvFilter', mt:'detalleMtFilter' };
+  const el = document.getElementById(map[key]);
+  if (el) el.value = '';
+  if (key === 'prov') { refreshDetalleDocOptionsSource(); refreshDetalleOcOptionsSource(); }
+  filterDetalle();
+}
+
+// ========== SELECTION ==========
+const selectedRows = new Set();
+
+function toggleRow(idx, cb) {
+  if (cb.checked) selectedRows.add(idx);
+  else selectedRows.delete(idx);
+  document.getElementById('checkAll').indeterminate = selectedRows.size > 0 && selectedRows.size < detalleFiltered.length;
+  document.getElementById('checkAll').checked = selectedRows.size === detalleFiltered.length && detalleFiltered.length > 0;
+  updateBulkBar();
+}
+
+function toggleAllRows(masterCb) {
+  selectedRows.clear();
+  if (masterCb.checked) detalleFiltered.forEach((_, i) => selectedRows.add(i));
+  document.querySelectorAll('.row-cb').forEach((cb, i) => cb.checked = masterCb.checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  if (selectedRows.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('bulkCount').textContent = selectedRows.size + ' fila' + (selectedRows.size > 1 ? 's' : '') + ' seleccionada' + (selectedRows.size > 1 ? 's' : '');
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearSelection() {
+  selectedRows.clear();
+  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('checkAll');
+  ca.checked = false; ca.indeterminate = false;
+  updateBulkBar();
+}
+
+function exportSelected() {
+  const rows = [...selectedRows].map(i => detalleFiltered[i]);
+  download('seleccion_detalle.csv', Papa.unparse(rows), 'text/csv');
+}
+
+// ========== SORTING ==========
+let sortCol = null, sortDir = 1;
+function sortDetalle(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  ['mes','fecha','oc','qty'].forEach(c => {
+    const el = document.getElementById('sort-' + c);
+    if (el) el.textContent = c === col ? (sortDir === 1 ? 'arrow_upward' : 'arrow_downward') : 'unfold_more';
+  });
+  detalleFiltered.sort((a, b) => {
+    let va, vb;
+    if (col === 'mes')   { va = getMesIndexFromRow(a); vb = getMesIndexFromRow(b); }
+    else if (col === 'fecha') { va = colVal(a,['REGISTRO']); vb = colVal(b,['REGISTRO']); }
+    else if (col === 'oc')   { va = colVal(a,['REFERENTE']); vb = colVal(b,['REFERENTE']); }
+    else if (col === 'qty')  { va = getCantidad(a); vb = getCantidad(b); }
+    if (va < vb) return -sortDir; if (va > vb) return sortDir; return 0;
+  });
+  selectedRows.clear(); updateBulkBar();
+  renderDetalleTable(detalleFiltered);
+}
+
+function renderDetalleTable(rows) {
+  const tbody = document.getElementById('detalleBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
+    document.getElementById('detalleCount').textContent = '0 registros';
+    document.getElementById('detalleTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => {
+    const mes  = getMesFromRegistro(r);
+    const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
+    const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
+    const oc   = colVal(r, ['REFERENTE']);
+    const prov = colVal(r, ['PROVEEDOR']);
+    const doc  = colVal(r, ['DOCUMENTO']);
+    const mat  = colVal(r, ['MATERIAL NUMBER']);
+    const desc = colVal(r, ['ARTICLE DESCRIPTION']);
+    const ean  = colVal(r, ['EAN-CODE', 'COD-EAN']);
+    const lote = colVal(r, ['LOTE']);
+    const exp  = colVal(r, ['EXPIRA']);
+    const qty  = colVal(r, ['CANT.', 'CANT']);
+    const isSelected = selectedRows.has(i);
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}" data-idx="${i}">
+      <td class="px-md py-sm">
+        <input type="checkbox" class="row-cb rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" ${isSelected?'checked':''} onchange="toggleRow(${i}, this)"/>
+      </td>
+      <td class="px-md py-sm">
+        <span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span>
+      </td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
+      <td class="px-md py-sm font-mono-data text-[12px] font-bold text-primary">${oc}</td>
+      <td class="px-md py-sm text-on-surface text-[13px] max-w-[160px] truncate font-semibold" title="${prov}">${prov || '—'}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
+      <td class="px-md py-sm font-semibold text-body-md text-on-surface whitespace-nowrap">${mat}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${ean}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${lote}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${exp}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = rows.reduce((s, r) => s + getCantidad(r), 0);
+  document.getElementById('detalleCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('detalleTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
+}
+
+// ========== RENDER PANEL (charts based on DETALLE) ==========
+function renderPanel() {
+  // --- Monthly KPI from DETALLE ---
+  // Proveedores = valores únicos de DOCUMENTO por mes
+  // Unidades    = suma de CANT. por mes
+  const byMes = {};
+  MESES_ES.forEach((m, i) => { byMes[i] = { providers: new Set(), units: 0 }; });
+
+  detalleData.forEach(r => {
+    const idx = getMesIndexFromRow(r);
+    if (idx < 0) return;
+    const doc = colVal(r, ['DOCUMENTO']);
+    if (doc) byMes[idx].providers.add(doc);
+    byMes[idx].units += getCantidad(r);
+  });
+
+  // KPI Cards
+  const kpiGrid = document.getElementById('kpiGrid');
+  kpiGrid.innerHTML = MESES_ES.map((m, i) => {
+    const d = byMes[i];
+    const hasData = d.units > 0 || d.providers.size > 0;
+    const mCap = m.charAt(0).toUpperCase() + m.slice(1);
+    return `<div class="bg-surface-container-lowest p-md rounded-xl ghost-border hover:shadow-md transition-all">
+      <p class="font-label-md text-label-md text-primary uppercase font-bold mb-xs">${mCap}</p>
+      <div class="space-y-base">
+        <div class="flex items-center gap-xs">
+          <span class="material-symbols-outlined text-on-surface-variant" title="Documentos únicos">group</span>
+          <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.providers.size : '—'}</p>
+        </div>
+        <div class="flex items-center gap-xs">
+          <span class="material-symbols-outlined text-on-surface-variant" title="Unidades (CANT.)">inventory_2</span>
+          <p class="font-headline-sm text-headline-sm text-on-surface">${hasData ? d.units.toLocaleString('es-PE') : '—'}</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // --- Line chart: Unidades + Proveedores por mes ---
+  const unitsData = MESES_ES.map((_, i) => byMes[i].units);
+  const provData  = MESES_ES.map((_, i) => byMes[i].providers.size);
+
+  const ctx = document.getElementById('incomeTrendChart').getContext('2d');
+  if (chartLine) chartLine.destroy();
+  const gradientUnits = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientUnits.addColorStop(0, 'rgba(0, 91, 191, 0.2)');
+  gradientUnits.addColorStop(1, 'rgba(0, 91, 191, 0)');
+  chartLine = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MESES_SHORT,
+      datasets: [
+        {
+          label: 'Unidades', data: unitsData,
+          borderColor: '#005bbf', backgroundColor: gradientUnits,
+          fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#ffffff', pointBorderColor: '#005bbf', pointBorderWidth: 2, yAxisID: 'y'
+        },
+        {
+          label: 'Proveedores', data: provData,
+          borderColor: '#006d3a', borderDash: [5,5],
+          fill: false, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#ffffff', pointBorderColor: '#006d3a', pointBorderWidth: 2, yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          backgroundColor: '#181c20',
+          titleFont: {family:'Inter',weight:'600'}, bodyFont: {family:'Inter'}, padding: 12,
+          callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + ctx.parsed.y.toLocaleString('es-PE') }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true, position: 'left',
+          grid: { color: '#ebeef4', drawBorder: false },
+          ticks: { color:'#727785', font:{family:'JetBrains Mono',size:10}, callback: v => v>=1000?(v/1000)+'k':v }
+        },
+        y1: {
+          beginAtZero: true, position: 'right',
+          grid: { display: false },
+          ticks: { color:'#006d3a', font:{family:'JetBrains Mono',size:10} }
+        },
+        x: { grid:{display:false}, ticks:{color:'#727785',font:{family:'Inter',weight:'600',size:10}} }
+      },
+      interaction: { intersect: false, mode: 'nearest' }
+    }
+  });
+
+  // --- Panel table: todos los registros ordenados más reciente primero ---
+  panelTableData = [...detalleData].sort((a, b) => {
+    const da = new Date(colVal(a,['REGISTRO']).replace(/(\d{2})\/(\d{2})\/(\d{4})/,'$3-$2-$1'));
+    const db = new Date(colVal(b,['REGISTRO']).replace(/(\d{2})\/(\d{2})\/(\d{4})/,'$3-$2-$1'));
+    return db - da;
+  });
+
+  // Populate panel mes filter
+  const panelMeses = MESES_ES.filter(m => panelTableData.some(r => getMesFromRegistro(r) === m));
+  const selPanel = document.getElementById('panelMesFilter');
+  selPanel.innerHTML = '<option value="">Todos los meses</option>' +
+    panelMeses.map(m => `<option value="${m}">${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('');
+
+  filterPanelTable();
+}
+
+// ========== PANEL TABLE FILTER (independiente de KPIs y gráfico) ==========
+let panelTableData = [];
+let panelTableFiltered = [];
+
+function filterPanelTable() {
+  const mes = (document.getElementById('panelMesFilter')?.value || '').toLowerCase();
+  const doc = (document.getElementById('panelDocFilter')?.value || '').toLowerCase();
+  const mat = (document.getElementById('panelMatFilter')?.value || '').toLowerCase();
+
+  panelTableFiltered = panelTableData.filter(r => {
+    if (mes && getMesFromRegistro(r).toLowerCase() !== mes) return false;
+    if (doc && !colVal(r,['DOCUMENTO']).toLowerCase().includes(doc)) return false;
+    if (mat && !colVal(r,['MATERIAL NUMBER']).toLowerCase().includes(mat)) return false;
+    return true;
+  });
+  renderPanelTable(panelTableFiltered);
+}
+
+function renderPanelTable(rows) {
+  const tbody = document.getElementById('panelRecentTable');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('panelTableCount').textContent = '0 registros';
+    document.getElementById('panelTableTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const mes  = getMesFromRegistro(r);
+    const mesCap = mes ? mes.charAt(0).toUpperCase()+mes.slice(1) : '—';
+    const fec  = colVal(r,['REGISTRO']).split(' ')[0];
+    const oc   = colVal(r,['REFERENTE']);
+    const doc  = colVal(r,['DOCUMENTO']);
+    const mat  = colVal(r,['MATERIAL NUMBER']);
+    const desc = colVal(r,['ARTICLE DESCRIPTION']);
+    const qty  = colVal(r,['CANT.','CANT']);
+    return `<tr class="hover:bg-blue-50/40 transition-colors">
+      <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-primary/10 text-primary">${mesCap}</span></td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${fec}</td>
+      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold">${oc}</td>
+      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${doc}</td>
+      <td class="px-md py-sm font-semibold text-body-md">${mat}</td>
+      <td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${desc}">${desc}</td>
+      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = rows.reduce((s,r) => s + getCantidad(r), 0);
+  document.getElementById('panelTableCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
+  document.getElementById('panelTableTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
+}
+
+// ========== EXPORT XLSX (SheetJS) ==========
+// Columnas que deben ser texto para evitar notación científica
+const FORCE_TEXT_COLS = ['ID','EAN','LOTE','COD','CODE','CODIGO','BARCODE',
+  'ID DETALLE','COD-EAN','EAN-CODE','MATERIAL','MATERIAL NUMBER','REFERENTE','DOCUMENTO',
+  'ORD','REGISTRO','INGRESO','EXPIRA','UBIC','BODEGA','OBSERVACIONES','PROVEEDOR',
+  'FECHA','MES','MES - AÑO','FECHA DE RECEPCIÓN','FECHA DE EMISIÓN NI',
+  'FECHA RECEPCIÓN','FECHA EMISIÓN','FECHA DE EJECUCIÓN','FECHA EJECUCION',
+  'HORA','OC'];
+
+function colIsText(colName) {
+  const cu = colName.trim().toUpperCase();
+  return FORCE_TEXT_COLS.some(f => cu.includes(f));
+}
+
+function downloadXLSX(filename, data, sheetName) {
+  if (!data || !data.length) { alert('No hay datos para exportar.'); return; }
+
+  const cols = Object.keys(data[0]);
+
+  const aoaHeader = cols;
+  const aoaRows   = data.map(r =>
+    cols.map(c => {
+      const v = r[c] ?? '';
+      const s = String(v).trim();
+      // Forzar texto si: columna es de tipo texto, valor parece fecha (DD/MM/YYYY o MMM-YY), o contiene '/'
+      if (colIsText(c)) return s;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;   // DD/MM/YYYY → texto
+      if (/^[A-Za-z]{3}-\d{2}$/.test(s))   return s;   // Jun-26 → texto
+      if (s.includes('/'))                  return s;   // cualquier fecha con /
+      if (s === '-')                        return s;   // guión siempre texto
+      // Solo convertir a número si el string COMPLETO es numérico (evita que
+      // "14-00001242" se trunque a 14 por un parseFloat parcial)
+      const isFullNumber = /^-?\d+(\.\d+)?$/.test(s.replace(/,/g,''));
+      if (isFullNumber && s !== '' && !/^0\d/.test(s)) {
+        return parseFloat(s.replace(/,/g,''));
+      }
       return s;
     })
   );
