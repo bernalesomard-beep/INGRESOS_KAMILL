@@ -3374,9 +3374,9 @@ function exportHorizonte() {
 const REGDOC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1471400494&single=true&output=csv';
 
 // URL del Google Apps Script (Web App) que escribe LEADTIME / ESTATUS ALMACEN / REGISTRO DE ALMACEN
-// de vuelta en la hoja. Reemplaza esto por tu URL /exec una vez que despliegues el script
-// (ver Code.gs que te entrego aparte). Mientras esté vacío, "Grabar" solo guarda en esta app (local).
-const REGDOC_SAVE_URL = ''; // <-- pega aquí tu URL terminada en /exec
+// de vuelta en la hoja. Es el MISMO Apps Script que ya usas para Registro/Detalle
+// (misma hoja de cálculo, distinta pestaña), así que reutilizamos APPS_SCRIPT_URL.
+const REGDOC_SAVE_URL = APPS_SCRIPT_URL;
 
 const REGDOC_HORARIO = { inicio: 8, fin: 18 }; // Lunes a Viernes, 8:00–18:00
 const REGDOC_LIMITE_HORAS = 24; // horas hábiles máximas permitidas
