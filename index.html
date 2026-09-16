@@ -155,6 +155,10 @@
       <span class="material-symbols-outlined">calendar_month</span>
       <span class="font-label-md text-label-md">Horizonte</span>
     </div>
+    <div class="nav-item" onclick="showSection('regdoc')">
+      <span class="material-symbols-outlined">fact_check</span>
+      <span class="font-label-md text-label-md">Registro Documentario</span>
+    </div>
   </nav>
   <div class="mt-auto pt-lg">
     <div class="mt-lg flex items-center gap-md p-sm bg-surface-container-lowest rounded-xl ghost-border">
@@ -935,6 +939,86 @@
         <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
           <span id="horizonteCount" class="text-body-sm text-on-surface-variant">—</span>
           <span id="horizonteTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== REGISTRO DOCUMENTARIO SECTION ===== -->
+  <div id="section-regdoc" class="section-content">
+    <section class="mb-xl">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Registro Documentario</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Leadtime de recepción — fuente: Google Sheets (CSV público)</p>
+        </div>
+        <div class="flex items-center gap-md">
+          <div class="flex flex-col items-end px-md py-xs bg-white border border-outline-variant rounded-lg shadow-sm">
+            <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Fecha actual</span>
+            <span id="regdocReloj" class="font-mono-data text-[13px] font-bold text-on-surface">—</span>
+          </div>
+          <button onclick="loadRegistroDocumentario()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearRegdocFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-3 gap-md">
+          <div>
+            <label class="form-label">Estatus almacén</label>
+            <select id="regdocEstatusFilter" onchange="filterRegdoc()" class="form-input">
+              <option value="">Todos</option>
+              <option value="CONFORME">Conforme</option>
+              <option value="RETRASADO">Retrasado</option>
+              <option value="PENDIENTE">Pendiente de grabar</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label class="form-label">Búsqueda (Ticket, OC, Referencia, Doc. Guía)</label>
+            <input id="regdocBuscarFilter" oninput="filterRegdocDebounced()" class="form-input" placeholder="Buscar..." type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px] hide-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low sticky top-0 z-10">
+              <tr>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">REGISTRO DE TICKET</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">DOC. GUÍA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">REFERENCIA</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">OC</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">TICKET</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">BULTOS</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap">PALET</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">FECHA ACTUAL</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">LEADTIME RECEPCIÓN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">ESTATUS ALMACÉN</th>
+                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap">REGISTRO DE ALMACÉN</th>
+              </tr>
+            </thead>
+            <tbody id="regdocBody" class="divide-y divide-outline-variant">
+              <tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Footer -->
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="regdocCount" class="text-body-sm text-on-surface-variant">—</span>
+          <div class="flex items-center gap-md text-body-sm">
+            <span class="flex items-center gap-xs"><span class="w-2 h-2 rounded-full" style="background:#006d3a"></span> Conforme</span>
+            <span class="flex items-center gap-xs"><span class="w-2 h-2 rounded-full" style="background:#ba1a1a"></span> Retrasado</span>
+          </div>
         </div>
       </div>
     </section>
@@ -3285,6 +3369,269 @@ function exportHorizonte() {
 }
 
 
+// ========== REGISTRO DOCUMENTARIO ==========
+// Fuente CSV publicada de Google Sheets
+const REGDOC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1471400494&single=true&output=csv';
+
+// URL del Google Apps Script (Web App) que escribe LEADTIME / ESTATUS ALMACEN / REGISTRO DE ALMACEN
+// de vuelta en la hoja. Reemplaza esto por tu URL /exec una vez que despliegues el script
+// (ver Code.gs que te entrego aparte). Mientras esté vacío, "Grabar" solo guarda en esta app (local).
+const REGDOC_SAVE_URL = ''; // <-- pega aquí tu URL terminada en /exec
+
+const REGDOC_HORARIO = { inicio: 8, fin: 18 }; // Lunes a Viernes, 8:00–18:00
+const REGDOC_LIMITE_HORAS = 24; // horas hábiles máximas permitidas
+
+let regdocRaw = [];       // filas crudas ya normalizadas desde el CSV
+let regdocData = [];      // filas calculadas (incluye leadtime/estatus en vivo o congelado)
+let regdocFiltered = [];
+let regdocLocal = {};     // overrides locales por idDoc: { leadtime, estatus, registroAlmacen, savedRemote }
+let regdocClockTimer = null;
+
+// Parsea "DD/MM/YYYY HH:MM:SS" o "DD/MM/YYYY" a Date
+function parseFechaHoraDDMMYYYY(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (!m) return null;
+  const [, d, mo, y, h, mi, se] = m;
+  const dt = new Date(+y, +mo - 1, +d, h ? +h : 0, mi ? +mi : 0, se ? +se : 0);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatFechaHora(d) {
+  if (!d) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// Horas hábiles (Lun-Vie, HORARIO.inicio a HORARIO.fin) transcurridas entre dos fechas
+function businessHoursBetween(start, end) {
+  if (!start || !end || end <= start) return 0;
+  const { inicio, fin } = REGDOC_HORARIO;
+  let totalMs = 0;
+  let cursor = new Date(start);
+  let guard = 0;
+  while (cursor < end && guard < 3650) { // tope de seguridad ~10 años
+    guard++;
+    const day = cursor.getDay();
+    if (day === 0 || day === 6) {
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0);
+      continue;
+    }
+    const dayStart = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), inicio, 0, 0);
+    const dayEnd   = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), fin, 0, 0);
+    const segStart = cursor < dayStart ? dayStart : cursor;
+    if (segStart >= dayEnd) {
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0);
+      continue;
+    }
+    const segEnd = end < dayEnd ? end : dayEnd;
+    if (segEnd > segStart) totalMs += (segEnd - segStart);
+    if (end <= dayEnd) break;
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0);
+  }
+  return totalMs / 3600000; // horas
+}
+
+function formatHoras(h) {
+  if (h == null || isNaN(h)) return '—';
+  const totalMin = Math.round(h * 60);
+  const hh = Math.floor(totalMin / 60);
+  const mm = totalMin % 60;
+  return `${hh}h ${String(mm).padStart(2,'0')}m`;
+}
+
+function loadRegistroDocumentario() {
+  const tbody = document.getElementById('regdocBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>';
+
+  Papa.parse(REGDOC_CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      regdocRaw = (results.data || []).map(raw => {
+        const idDoc = colVal(raw, ['ID DOC']);
+        const registroTicketStr = colVal(raw, ['REGISTRO DE TICKET']);
+        return {
+          idDoc,
+          registroTicket: registroTicketStr,
+          registroTicketDate: parseFechaHoraDDMMYYYY(registroTicketStr),
+          docGuia: colVal(raw, ['DOC. GUIA', 'DOC GUIA', 'DOC. GUÍA']),
+          referencia: colVal(raw, ['REFERENCIA']),
+          oc: colVal(raw, ['OC']),
+          ticket: colVal(raw, ['TICKET']),
+          bultos: colVal(raw, ['BULTOS']),
+          palet: colVal(raw, ['PALET']),
+          // Valores ya guardados en la hoja (si el Apps Script ya escribió antes)
+          estatusSheet: colVal(raw, ['ESTATUS ALMACEN', 'ESTATUS ALMACÉN']),
+          leadtimeSheet: colVal(raw, ['LEADTIME RECEPCCION', 'LEADTIME RECEPCION']),
+          registroAlmacenSheet: colVal(raw, ['REGISTRO DE ALMACEN', 'REGISTRO DE ALMACÉN']),
+        };
+      }).filter(r => r.idDoc); // se omiten filas sin ID DOC
+
+      renderRegdoc();
+      if (!regdocClockTimer) {
+        regdocClockTimer = setInterval(renderRegdoc, 60000); // recalcula leadtime en vivo cada minuto
+      }
+    },
+    error: function(err) {
+      console.error(err);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-error">⚠️ Error al cargar Registro Documentario. Verifica que la hoja esté publicada como CSV.</td></tr>';
+    }
+  });
+}
+
+// Construye regdocData combinando: overrides locales > lo ya guardado en la hoja > cálculo en vivo
+function buildRegdocRows() {
+  const ahora = new Date();
+  return regdocRaw.map(r => {
+    const local = regdocLocal[r.idDoc];
+    const yaGrabado = !!(local?.registroAlmacen || r.registroAlmacenSheet);
+
+    if (yaGrabado) {
+      return {
+        ...r,
+        fechaActual: local?.fechaActual || null,
+        leadtimeHoras: local ? local.leadtime : (parseFloat(r.leadtimeSheet) || null),
+        estatus: local ? local.estatus : (r.estatusSheet || '—'),
+        registroAlmacen: local?.registroAlmacen || r.registroAlmacenSheet,
+        grabado: true,
+      };
+    }
+
+    const leadtimeHoras = r.registroTicketDate ? businessHoursBetween(r.registroTicketDate, ahora) : null;
+    const estatus = leadtimeHoras == null ? '—' : (leadtimeHoras <= REGDOC_LIMITE_HORAS ? 'CONFORME' : 'RETRASADO');
+    return {
+      ...r,
+      fechaActual: ahora,
+      leadtimeHoras,
+      estatus,
+      registroAlmacen: null,
+      grabado: false,
+    };
+  });
+}
+
+function renderRegdoc() {
+  if (document.getElementById('regdocReloj')) {
+    document.getElementById('regdocReloj').textContent = formatFechaHora(new Date());
+  }
+  if (!regdocRaw.length) return;
+  regdocData = buildRegdocRows();
+  filterRegdoc();
+}
+
+function filterRegdoc() {
+  const estatusF = document.getElementById('regdocEstatusFilter')?.value || '';
+  const buscar = (document.getElementById('regdocBuscarFilter')?.value || '').toLowerCase().trim();
+
+  regdocFiltered = regdocData.filter(r => {
+    if (estatusF === 'PENDIENTE' && r.grabado) return false;
+    if ((estatusF === 'CONFORME' || estatusF === 'RETRASADO') && r.estatus !== estatusF) return false;
+    if (buscar) {
+      const hay = [r.ticket, r.oc, r.referencia, r.docGuia].join(' ').toLowerCase();
+      if (!hay.includes(buscar)) return false;
+    }
+    return true;
+  });
+
+  renderRegdocTable();
+}
+
+let regdocFilterTimer = null;
+function filterRegdocDebounced() {
+  clearTimeout(regdocFilterTimer);
+  regdocFilterTimer = setTimeout(filterRegdoc, 250);
+}
+
+function clearRegdocFilters() {
+  document.getElementById('regdocEstatusFilter').value = '';
+  document.getElementById('regdocBuscarFilter').value = '';
+  filterRegdoc();
+}
+
+const REGDOC_ESTATUS_STYLES = {
+  CONFORME:  'bg-secondary-container text-on-secondary-container',
+  RETRASADO: 'bg-error-container text-error',
+};
+
+function renderRegdocTable() {
+  const tbody = document.getElementById('regdocBody');
+  if (!tbody) return;
+
+  if (!regdocFiltered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
+    document.getElementById('regdocCount').textContent = '0 registros';
+    return;
+  }
+
+  tbody.innerHTML = regdocFiltered.map(r => {
+    const estatusCls = REGDOC_ESTATUS_STYLES[r.estatus] || 'bg-surface-container-high text-on-surface-variant';
+    const accionHtml = r.grabado
+      ? `<span class="font-mono-data text-[12px] text-on-surface-variant">${typeof r.registroAlmacen === 'string' ? r.registroAlmacen : formatFechaHora(r.registroAlmacen)}</span>`
+      : `<button onclick="grabarRegdoc('${r.idDoc}')" class="flex items-center gap-xs px-sm py-xs bg-primary text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-all">
+           <span class="material-symbols-outlined text-[14px]">save</span> Grabar
+         </button>`;
+    return `
+      <tr class="hover:bg-blue-50/40 transition-colors">
+        <td class="px-md py-sm font-mono-data text-[12px] text-on-surface whitespace-nowrap">${r.registroTicket || '—'}</td>
+        <td class="px-md py-sm text-on-surface text-[13px] whitespace-nowrap">${r.docGuia || '—'}</td>
+        <td class="px-md py-sm text-on-surface text-[13px] whitespace-nowrap">${r.referencia || '—'}</td>
+        <td class="px-md py-sm text-on-surface text-[13px] whitespace-nowrap">${r.oc || '—'}</td>
+        <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${r.ticket || '—'}</td>
+        <td class="px-md py-sm text-right font-mono-data text-[13px]">${r.bultos || '—'}</td>
+        <td class="px-md py-sm text-right font-mono-data text-[13px]">${r.palet || '—'}</td>
+        <td class="px-md py-sm font-mono-data text-[12px] text-on-surface-variant whitespace-nowrap">${r.grabado ? '—' : formatFechaHora(r.fechaActual)}</td>
+        <td class="px-md py-sm font-mono-data text-[12px] text-on-surface whitespace-nowrap">${formatHoras(r.leadtimeHoras)}</td>
+        <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${estatusCls}">${r.estatus}</span></td>
+        <td class="px-md py-sm whitespace-nowrap">${accionHtml}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('regdocCount').textContent = regdocFiltered.length.toLocaleString('es-PE') + ' registros';
+}
+
+// Congela leadtime/estatus al momento de grabar y los envía al Apps Script (si está configurado)
+function grabarRegdoc(idDoc) {
+  const fila = regdocData.find(r => r.idDoc === idDoc);
+  if (!fila) return;
+
+  const ahora = new Date();
+  const leadtimeHoras = fila.registroTicketDate ? businessHoursBetween(fila.registroTicketDate, ahora) : null;
+  const estatus = leadtimeHoras == null ? '—' : (leadtimeHoras <= REGDOC_LIMITE_HORAS ? 'CONFORME' : 'RETRASADO');
+  const registroAlmacenStr = formatFechaHora(ahora);
+
+  // 1) Guardado optimista local: se ve al instante en la tabla, pase lo que pase con la red
+  regdocLocal[idDoc] = {
+    leadtime: leadtimeHoras,
+    estatus,
+    registroAlmacen: registroAlmacenStr,
+    savedRemote: false,
+  };
+  renderRegdoc();
+
+  // 2) Envío al Google Apps Script para que quede también en la hoja de cálculo
+  if (!REGDOC_SAVE_URL) {
+    console.warn('REGDOC_SAVE_URL no configurada: el registro solo quedó guardado en esta app, no en el Google Sheet.');
+    return;
+  }
+  fetch(REGDOC_SAVE_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      idDoc,
+      leadtimeHoras: leadtimeHoras == null ? '' : leadtimeHoras.toFixed(2),
+      estatusAlmacen: estatus,
+      registroAlmacen: registroAlmacenStr,
+    }),
+  })
+    .then(() => { regdocLocal[idDoc].savedRemote = true; })
+    .catch(err => {
+      console.error('Error al grabar en el Google Sheet:', err);
+      alert('Se guardó en esta app, pero no se pudo confirmar el guardado en el Google Sheet. Revisa la conexión o el enlace del Apps Script.');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.ghost-border').forEach(card => {
     card.addEventListener('mouseenter', () => { card.style.transform = 'translateY(-2px)'; });
@@ -3292,6 +3639,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   loadAllData();
   loadHorizonte();
+  loadRegistroDocumentario();
 });
 </script>
 </body>
