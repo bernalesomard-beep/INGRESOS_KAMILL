@@ -1502,28 +1502,69 @@ function _getKeyPairs(row) {
   let pairs = _rowKeyPairsCache.get(row);
   if (!pairs) {
     pairs = Object.keys(row).map(k => ({ k, kn: k.trim().toUpperCase() }));
+    pairs.shape = _shapeFor(pairs);
     _rowKeyPairsCache.set(row, pairs);
   }
   return pairs;
 }
 
+
+// ===== Paginación (200 filas por bloque) + índice de búsqueda =====
+const PAGE_SIZE = 200;
+const _lim = { registro: PAGE_SIZE, ticket: PAGE_SIZE, detalle: PAGE_SIZE };
+const _lastRows = {};
+let _keepLim = false;
+const _rowTextCache = new WeakMap();
+function _rowText(r) {
+  let t = _rowTextCache.get(r);
+  if (t === undefined) { t = Object.values(r).join(' ').toLowerCase(); _rowTextCache.set(r, t); }
+  return t;
+}
+function _pgStart(key, rows) {
+  if (!_keepLim) _lim[key] = PAGE_SIZE;
+  _keepLim = false;
+  _lastRows[key] = rows;
+}
+const _pgFns = {};
+function _pgMore(key) {
+  _lim[key] += PAGE_SIZE; _keepLim = true;
+  _pgFns[key](_lastRows[key]);
+}
+let _pgObserver = null;
+function _moreRow(key, total, cols) {
+  if (total <= _lim[key]) return '';
+  setTimeout(() => {
+    const el = document.getElementById('more-' + key);
+    if (!el) return;
+    if (!_pgObserver) _pgObserver = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { _pgObserver.unobserve(e.target); _pgMore(e.target.dataset.key); }
+    }), { rootMargin: '300px' });
+    _pgObserver.observe(el);
+  }, 0);
+  return `<tr id="more-${key}" data-key="${key}"><td colspan="${cols}" class="px-lg py-md text-center text-on-surface-variant text-[12px]">Mostrando ${_lim[key].toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} · <button class="underline text-primary font-semibold" onclick="_pgMore('${key}')">Mostrar más</button></td></tr>`;
+}
+
+const _shapes = new Map();
+function _shapeFor(pairs) {
+  const sig = pairs.map(p => p.k).join('\u0001');
+  let sh = _shapes.get(sig);
+  if (!sh) { sh = { res: new Map() }; _shapes.set(sig, sh); }
+  return sh;
+}
+function _resolveKey(pairs, names) {
+  const namesUpper = names.map(n => n.toUpperCase());
+  for (const { k, kn } of pairs) for (const nu of namesUpper) if (kn === nu) return k;      // exacto primero
+  for (const { k, kn } of pairs) for (const nu of namesUpper) if (kn.includes(nu)) return k; // luego "contiene"
+  return null;
+}
 function colVal(row, names) {
   if (!row || typeof row !== 'object') return '';
   const pairs = _getKeyPairs(row);
-  const namesUpper = names.map(n => n.toUpperCase());
-  // Exact match first
-  for (const { k, kn } of pairs) {
-    for (const nu of namesUpper) {
-      if (kn === nu) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
-    }
-  }
-  // Fallback: includes
-  for (const { k, kn } of pairs) {
-    for (const nu of namesUpper) {
-      if (kn.includes(nu)) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
-    }
-  }
-  return '';
+  const nk = names.join('|');
+  let k = pairs.shape.res.get(nk);
+  if (k === undefined) { k = _resolveKey(pairs, names); pairs.shape.res.set(nk, k); }
+  if (k === null) return '';
+  return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
 }
 
 // Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS), cacheado por fila
@@ -1632,7 +1673,7 @@ function filterRegistro() {
       if (docKey && !String(r[docKey]||'').toLowerCase().includes(doc)) return false;
     }
     if (q) {
-      if (!Object.values(r).join(' ').toLowerCase().includes(q)) return false;
+      if (!_rowText(r).includes(q)) return false;
     }
     return true;
   });
@@ -1728,6 +1769,7 @@ const NUM_COLS   = ['CANT.','CANT','CANTIDAD','QUANTITY','ORD'];
 
 function renderRegistroTable(rows) {
   const tbody = document.getElementById('registroBody');
+  _pgStart('registro', rows);
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="${registroKeys.length + 1}" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>`;
     document.getElementById('registroCount').textContent = '0 registros';
@@ -1735,7 +1777,7 @@ function renderRegistroTable(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.map((r, i) => {
+  tbody.innerHTML = rows.slice(0, _lim.registro).map((r, i) => {
     const isSelected = selectedRegistroRows.has(i);
     const cells = registroKeys.map(k => {
       const v = r[k] || '';
@@ -1771,7 +1813,7 @@ function renderRegistroTable(rows) {
         return `<td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${v}">${v}</td>`;
       }
       return `<td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${v}</td>`;
-    }).join('');
+    }).join('') + _moreRow('registro', rows.length, registroKeys.length + 1);
 
     return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}">
       <td class="px-md py-sm">
@@ -1783,6 +1825,7 @@ function renderRegistroTable(rows) {
 
   document.getElementById('registroCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
 }
+_pgFns.registro = renderRegistroTable;
 
 // ========== TICKET (resumen agrupado por ORD, a partir de Registro) ==========
 let ticketData = [];
@@ -1964,6 +2007,7 @@ function fmtFechaCorta(d) {
 
 function renderTicketTable(rows) {
   const tbody = document.getElementById('ticketBody');
+  _pgStart('ticket', rows);
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('ticketCount').textContent = '0 tickets';
@@ -1971,7 +2015,7 @@ function renderTicketTable(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.map(t => {
+  tbody.innerHTML = rows.slice(0, _lim.ticket).map(t => {
     const mesCap = t.mes ? String(t.mes).charAt(0).toUpperCase() + String(t.mes).slice(1) : '—';
     const cls = TICKET_ESTATUS_STYLES[String(t.estatus).toUpperCase()] || 'bg-gray-100 text-gray-600';
     const ltCls = LEAD_TIME_STYLES[t.leadTimeLevel] || LEAD_TIME_STYLES.none;
@@ -1989,7 +2033,7 @@ function renderTicketTable(rows) {
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${t.estatus || '—'}</span></td>
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${ltCls}">${t.leadTime || '—'}</span></td>
     </tr>`;
-  }).join('');
+  }).join('') + _moreRow('ticket', rows.length, 12);
 
   const totalRecibida = rows.reduce((s, t) => s + t.recibida, 0);
   const totalIngresada = rows.reduce((s, t) => s + t.ingresada, 0);
@@ -1997,6 +2041,7 @@ function renderTicketTable(rows) {
   document.getElementById('ticketTotal').textContent =
     'Recibido: ' + totalRecibida.toLocaleString('es-PE') + ' / Ingresado: ' + totalIngresada.toLocaleString('es-PE');
 }
+_pgFns.ticket = renderTicketTable;
 
 function exportTicket() {
   const rows = (ticketFiltered.length ? ticketFiltered : ticketData).map(t => ({
@@ -2362,13 +2407,14 @@ function sortDetalle(col) {
 
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
+  _pgStart('detalle', rows);
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
   }
-  tbody.innerHTML = rows.map((r, i) => {
+  tbody.innerHTML = rows.slice(0, _lim.detalle).map((r, i) => {
     const mes  = getMesFromRegistro(r);
     const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
     const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
@@ -2400,12 +2446,13 @@ function renderDetalleTable(rows) {
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${exp}</td>
       <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
     </tr>`;
-  }).join('');
+  }).join('') + _moreRow('detalle', rows.length, 12);
 
   const total = rows.reduce((s, r) => s + getCantidad(r), 0);
   document.getElementById('detalleCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
   document.getElementById('detalleTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
 }
+_pgFns.detalle = renderDetalleTable;
 
 // ========== RENDER PANEL (charts based on DETALLE) ==========
 function renderPanel() {
