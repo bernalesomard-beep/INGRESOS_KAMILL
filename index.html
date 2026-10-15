@@ -1109,17 +1109,25 @@ const REGISTRO_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcu
 // (así EAN, LOTE, etc. conservan ceros a la izquierda).
 const REGISTRO_NUM_COLS = ['ID IMPOR', 'QUANTITY', 'STOCK', 'CANT'];
 
-function fetchRegistroCSV(timeoutMs = 45000) {
+const DETALLE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
+
+// Lee un CSV publicado. headerRegex valida que realmente sea la hoja esperada
+// (si Google devuelve una página de error, no se acepta como datos).
+function fetchPublishedCSV(url, headerRegex, numCols = [], timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Tiempo de espera agotado leyendo Registro (CSV publicado).')), timeoutMs);
-    Papa.parse(REGISTRO_CSV_URL + '&_=' + Date.now(), {
+    const timer = setTimeout(() => reject(new Error('Tiempo de espera agotado leyendo el CSV publicado.')), timeoutMs);
+    Papa.parse(url + '&_=' + Date.now(), {
       download: true,
       header: true,
       skipEmptyLines: true,
       complete: function(res) {
         clearTimeout(timer);
+        const fields = (res.meta && res.meta.fields) || [];
+        if (!headerRegex.test(fields.join('|'))) {
+          return reject(new Error('El CSV publicado no tiene las columnas esperadas.'));
+        }
         const rows = (res.data || []).map(r => {
-          REGISTRO_NUM_COLS.forEach(c => {
+          numCols.forEach(c => {
             const v = r[c];
             if (v !== undefined && v !== null && String(v).trim() !== '' && !isNaN(Number(v))) r[c] = Number(v);
           });
@@ -1129,11 +1137,13 @@ function fetchRegistroCSV(timeoutMs = 45000) {
       },
       error: function(err) {
         clearTimeout(timer);
-        reject(new Error('No se pudo leer Registro (CSV): ' + ((err && err.message) || err)));
+        reject(new Error('No se pudo leer el CSV: ' + ((err && err.message) || err)));
       }
     });
   });
 }
+function fetchRegistroCSV() { return fetchPublishedCSV(REGISTRO_CSV_URL, /ID IMPOR/i, REGISTRO_NUM_COLS); }
+function fetchDetalleCSV()  { return fetchPublishedCSV(DETALLE_CSV_URL,  /DOCUMENTO|REFERENTE/i); }
 
 function downloadPlantillaVacia() {
   const headers = ['ID IMPOR', ...PLANTILLA_COLS];
@@ -1412,12 +1422,16 @@ function onSearch() {
 async function loadAllData() {
   document.getElementById('syncStatus').textContent = 'Sincronizando...';
   try {
-    // Registro: CSV publicado (rápido y estable). Si falla, se intenta el Apps Script.
+    // Registro y Detalle: CSV publicado (rápido y estable). Si fallan, se intenta el Apps Script (hasta 90 s).
     const regPromise = fetchRegistroCSV().catch(e => {
       console.warn('CSV de Registro falló, intento con Apps Script:', e);
-      return fetchSheetData('registro');
+      return fetchSheetData('registro', 90000);
     });
-    const [regRaw, detRaw] = await Promise.all([regPromise, fetchSheetData('detalle')]);
+    const detPromise = fetchDetalleCSV().catch(e => {
+      console.warn('CSV de Detalle falló, intento con Apps Script:', e);
+      return fetchSheetData('detalle', 90000);
+    });
+    const [regRaw, detRaw] = await Promise.all([regPromise, detPromise]);
     const reg = regRaw || [];
     const det = detRaw || [];
 
