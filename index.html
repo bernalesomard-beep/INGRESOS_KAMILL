@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>IncomeControl - Resumen Anual</title>
+<title>IncomeControl - Glimmer</title>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
@@ -127,7 +127,7 @@
   <div class="mb-xl flex items-center gap-md">
     <div>
       <h1 class="font-headline-md text-headline-md font-bold text-on-surface">Control de ingreso</h1>
-      <p class="text-body-sm text-on-surface-variant leading-none">CLIENTE - 271</p>
+      <p class="text-body-sm text-on-surface-variant leading-none">CLIENTE - GLIMMER</p>
     </div>
   </div>
   <nav class="flex-1 space-y-xs">
@@ -151,13 +151,13 @@
       <span class="material-symbols-outlined">bar_chart_4_bars</span>
       <span class="font-label-md text-label-md">KPI Ingreso</span>
     </div>
-    <div class="nav-item" onclick="showSection('horizonte')">
-      <span class="material-symbols-outlined">calendar_month</span>
-      <span class="font-label-md text-label-md">Horizonte</span>
-    </div>
     <div class="nav-item" onclick="showSection('regdoc')">
       <span class="material-symbols-outlined">fact_check</span>
       <span class="font-label-md text-label-md">Registro Documentario</span>
+    </div>
+    <div class="nav-item" onclick="showSection('movimientos')">
+      <span class="material-symbols-outlined">swap_horiz</span>
+      <span class="font-label-md text-label-md">Movimientos</span>
     </div>
   </nav>
   <div class="mt-auto pt-lg">
@@ -214,7 +214,7 @@
                 <span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">inventory_2</span>
                 <div>
                   <p class="text-[11px] font-bold text-on-surface-variant uppercase">Condiciones</p>
-                  <p class="text-body-sm text-on-surface">Mercadería paletizada y segregada (a cargo de Kamill)</p>
+                  <p class="text-body-sm text-on-surface">Mercadería paletizada y segregada (a cargo de Glimmer)</p>
                 </div>
               </div>
               <div class="flex items-start gap-sm">
@@ -826,125 +826,6 @@
     </section>
   </div>
 
-  <!-- ===== HORIZONTE SECTION ===== -->
-  <div id="section-horizonte" class="section-content">
-    <section class="mb-xl">
-      <!-- Header -->
-      <div class="flex justify-between items-center mb-lg">
-        <div>
-          <h2 class="font-display-lg text-display-lg text-on-surface">Horizonte</h2>
-          <p class="text-body-sm text-on-surface-variant mt-xs">Próximas llegadas — fuente: Google Sheets (CSV público)</p>
-        </div>
-        <div class="flex gap-md">
-          <button onclick="loadHorizonte()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
-          </button>
-          <button onclick="exportHorizonte()" class="flex items-center gap-sm px-md py-sm bg-primary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
-          </button>
-        </div>
-      </div>
-
-      <!-- Filter Bar -->
-      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
-        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm flex-wrap">
-          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
-          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
-          <div class="flex gap-xs ml-md flex-wrap">
-            <button onclick="setHorizontePreset('hoy')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Hoy</button>
-            <button onclick="setHorizontePreset('semana')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Esta semana</button>
-            <button onclick="setHorizontePreset('mes')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Este mes</button>
-            <button onclick="setHorizontePreset('todo')" class="px-sm py-xs text-[11px] font-semibold rounded-full bg-surface-container-high text-on-surface-variant hover:bg-secondary-container hover:text-on-secondary-container transition-all">Todo</button>
-          </div>
-          <button onclick="clearHorizonteFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
-        </div>
-        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
-          <div>
-            <label class="form-label">Desde</label>
-            <input id="horDesde" type="date" onchange="filterHorizonte()" class="form-input"/>
-          </div>
-          <div>
-            <label class="form-label">Hasta</label>
-            <input id="horHasta" type="date" onchange="filterHorizonte()" class="form-input"/>
-          </div>
-          <div class="md:col-span-2">
-            <label class="form-label">Proveedor / Cliente</label>
-            <input id="horProveedor" oninput="filterHorizonteDebounced()" class="form-input" placeholder="Buscar proveedor..." type="text"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- Calendario + Chart -->
-      <div class="grid grid-cols-12 gap-grid-gutter mb-md">
-        <!-- Calendario visual -->
-        <section class="col-span-12 lg:col-span-4 bg-surface-container-lowest p-lg rounded-xl ghost-border">
-          <div class="flex items-center justify-between mb-md">
-            <button onclick="shiftHorizonteMonth(-1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
-              <span class="material-symbols-outlined">chevron_left</span>
-            </button>
-            <span id="horCalLabel" class="font-headline-sm text-headline-sm text-on-surface">—</span>
-            <button onclick="shiftHorizonteMonth(1)" class="p-base hover:bg-surface-container-high rounded-full transition-colors">
-              <span class="material-symbols-outlined">chevron_right</span>
-            </button>
-          </div>
-          <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-on-surface-variant uppercase mb-xs">
-            <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
-          </div>
-          <div id="horCalGrid" class="grid grid-cols-7 gap-1"></div>
-          <div class="flex items-center gap-md mt-md text-[11px] text-on-surface-variant">
-            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded" style="background:#fdbc13"></div> En rango</div>
-            <div class="flex items-center gap-xs"><div class="w-3 h-3 rounded bg-surface-container-high"></div> Fuera de rango</div>
-          </div>
-        </section>
-
-        <!-- Chart -->
-        <section class="col-span-12 lg:col-span-8 bg-surface-container-lowest p-lg rounded-xl ghost-border">
-          <div class="flex justify-between items-center mb-md">
-            <div>
-              <h4 class="font-headline-sm text-headline-sm text-on-surface">Unidades por día</h4>
-              <p class="text-body-sm text-on-surface-variant">Según el rango filtrado</p>
-            </div>
-            <div class="flex items-center gap-xs">
-              <div class="w-3 h-3 rounded-full" style="background:#fdbc13"></div>
-              <span class="text-body-sm font-semibold">Unidades</span>
-            </div>
-          </div>
-          <div class="h-72 w-full overflow-x-auto hide-scrollbar">
-            <div id="horizonteChartInner" class="h-full" style="min-width:100%;">
-              <canvas id="horizonteChart"></canvas>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- Table -->
-      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
-        <div class="overflow-auto max-h-[520px]" style="overflow-x:auto;overflow-y:auto;">
-          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
-            <thead class="bg-surface-container-low sticky top-0 z-10">
-              <tr>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('fecha')">Fecha de Llegada <span id="hsort-fecha" class="text-primary"></span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('proveedor')">Proveedor / Cliente <span id="hsort-proveedor" class="text-primary"></span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('oc')">OC <span id="hsort-oc" class="text-primary"></span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('hora')">Hora <span id="hsort-hora" class="text-primary"></span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('codigos')">Códigos <span id="hsort-codigos" class="text-primary"></span></th>
-                <th class="px-md py-md font-label-md text-label-md text-on-surface-variant text-right whitespace-nowrap cursor-pointer select-none" onclick="sortHorizonte('unidades')">Unidades <span id="hsort-unidades" class="text-primary"></span></th>
-              </tr>
-            </thead>
-            <tbody id="horizonteBody" class="divide-y divide-outline-variant">
-              <tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
-          <span id="horizonteCount" class="text-body-sm text-on-surface-variant">—</span>
-          <span id="horizonteTotal" class="text-body-sm font-bold text-primary">—</span>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- ===== REGISTRO DOCUMENTARIO SECTION ===== -->
   <div id="section-regdoc" class="section-content">
     <section class="mb-xl">
       <!-- Header -->
@@ -1024,6 +905,84 @@
     </section>
   </div>
 
+  <!-- ===== MOVIMIENTOS SECTION ===== -->
+  <div id="section-movimientos" class="section-content">
+    <section class="mb-xl">
+      <div class="flex justify-between items-center mb-lg">
+        <div>
+          <h2 class="font-display-lg text-display-lg text-on-surface">Movimientos</h2>
+          <p class="text-body-sm text-on-surface-variant mt-xs">Transferencias registradas — RBLOT se completa con el LOTE BPCS del saldo</p>
+        </div>
+        <div class="flex gap-md">
+          <button onclick="loadMovimientos()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+          <button onclick="exportMovimientos()" class="flex items-center gap-sm px-md py-sm bg-white border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-high transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">download</span> Exportar XLSX
+          </button>
+          <button onclick="exportTRFMAN()" class="flex items-center gap-sm px-md py-sm bg-secondary text-white rounded-lg text-body-md font-semibold hover:opacity-90 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">upload_file</span> TRFMAN
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm mb-md">
+        <div class="px-lg py-md border-b border-outline-variant flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primary text-[16px]">filter_list</span>
+          <span class="font-label-md text-label-md text-on-surface-variant uppercase">Filtros</span>
+          <button onclick="clearMovFilters()" class="ml-auto text-[11px] text-primary font-semibold hover:underline">Limpiar filtros</button>
+        </div>
+        <div class="px-lg py-md grid grid-cols-2 md:grid-cols-4 gap-md">
+          <div>
+            <label class="form-label">Fecha desde</label>
+            <input id="movDesde" type="date" onchange="filterMov()" class="form-input"/>
+          </div>
+          <div>
+            <label class="form-label">Fecha hasta</label>
+            <input id="movHasta" type="date" onchange="filterMov()" class="form-input"/>
+          </div>
+          <div>
+            <label class="form-label">Código</label>
+            <input id="movCodigo" oninput="filterMovDebounced()" class="form-input" placeholder="Ej: GY6978931649480" type="text"/>
+          </div>
+          <div>
+            <label class="form-label">Referencia</label>
+            <input id="movReferencia" oninput="filterMovDebounced()" class="form-input" placeholder="Ej: EG07-00006557" type="text"/>
+          </div>
+        </div>
+      </div>
+
+      <div id="movBulkBar" class="hidden mb-md bg-primary text-white rounded-xl px-lg py-sm flex items-center gap-lg shadow-md">
+        <span id="movBulkCount" class="font-semibold text-body-md"></span>
+        <div class="flex gap-md ml-auto">
+          <button onclick="exportTRFMAN()" class="flex items-center gap-xs px-md py-xs bg-white/20 hover:bg-white/30 rounded-lg text-body-md font-semibold transition-all">
+            <span class="material-symbols-outlined text-[16px]">upload_file</span> TRFMAN de la selección
+          </button>
+          <button onclick="clearMovSelection()" class="flex items-center gap-xs px-md py-xs bg-white/10 hover:bg-white/20 rounded-lg text-body-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">close</span> Deseleccionar
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-auto max-h-[620px]" style="overflow-x:auto;overflow-y:auto;">
+          <table class="text-left border-collapse" style="min-width:max-content;width:100%;">
+            <thead id="movHead" class="sticky top-0 z-10">
+              <tr><th class="px-md py-md font-label-md text-label-md text-on-surface-variant">Cargando...</th></tr>
+            </thead>
+            <tbody id="movBody" class="divide-y divide-outline-variant">
+              <tr><td class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-lg py-sm border-t border-outline-variant flex justify-between items-center bg-surface-container-low/40">
+          <span id="movCount" class="text-body-sm text-on-surface-variant">—</span>
+          <span id="movTotal" class="text-body-sm font-bold text-primary">—</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
 </div>
 </main>
 
@@ -1046,104 +1005,65 @@ function debounce(fn, wait = 250) {
   };
 }
 // Nota: las funciones filterRegistro, filterTicket, filterDetalle, filterPanelTable,
-// filterKPI, filterHorizonte y onSearch son "function" (hoisted), por eso se pueden
+// filterKPI y onSearch son "function" (hoisted), por eso se pueden
 // envolver aquí aunque estén declaradas más abajo en el archivo.
 const filterRegistroDebounced   = debounce(() => filterRegistro());
 const filterTicketDebounced     = debounce(() => filterTicket());
 const filterDetalleDebounced    = debounce(() => filterDetalle());
 const filterPanelTableDebounced = debounce(() => filterPanelTable());
 const filterKPIDebounced        = debounce(() => filterKPI());
-const filterHorizonteDebounced  = debounce(() => filterHorizonte());
 const onSearchDebounced         = debounce(() => onSearch());
 
-// Fetch de datos vía Apps Script (sin proxy externo, sin CORS).
-// Incluye timeout: si Google Apps Script no responde en 20s, se corta la
-// espera y se muestra un error claro en vez de dejar "Sincronizando..." para siempre.
-function fetchSheetData(action, timeoutMs = 20000) {
-  const url = APPS_SCRIPT_URL + '?action=' + action + '&_=' + Date.now();
+// ========== FUENTES DE DATOS (Google Sheets publicados como CSV) ==========
+const REGISTRO_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRou8JP92n2PEaxvICAezyEI97CMOn41Sgt398wkFfklfZaIMN7DKKC9OJYBMhQmsdnCQKfcL9GTdTH/pub?gid=1508679406&single=true&output=csv';
+const DETALLE_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRou8JP92n2PEaxvICAezyEI97CMOn41Sgt398wkFfklfZaIMN7DKKC9OJYBMhQmsdnCQKfcL9GTdTH/pub?gid=1518657548&single=true&output=csv';
+
+function fetchCsv(url, label, timeoutMs = 20000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  return fetch(url, { signal: controller.signal })
+  return fetch(url + '&_=' + Date.now(), { signal: controller.signal })
     .then(resp => {
       clearTimeout(timer);
-      if (!resp.ok) throw new Error('Error de red (' + resp.status + ') al pedir ' + action);
-      return resp.json();
+      if (!resp.ok) throw new Error('Error de red (' + resp.status + ') al pedir ' + label);
+      return resp.text();
     })
-    .then(data => {
-      if (data && data.error) throw new Error(data.error);
-      if (action === 'all') {
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-          throw new Error('Respuesta inesperada del servidor para ' + action + '.');
-        }
-        return data;
-      }
-      if (!Array.isArray(data)) throw new Error('Respuesta inesperada del servidor para ' + action + '.');
-      return data;
-    })
+    .then(text => Papa.parse(text, { header: true, skipEmptyLines: true }).data)
     .catch(err => {
       clearTimeout(timer);
-      if (err.name === 'AbortError') {
-        throw new Error('Tiempo de espera agotado (' + (timeoutMs / 1000) + 's) conectando con Google Sheets. Revisa tu conexión a internet o que el Apps Script esté desplegado y accesible.');
-      }
+      if (err.name === 'AbortError') throw new Error('Tiempo de espera agotado (' + (timeoutMs / 1000) + 's) conectando con Google Sheets. Revisa tu conexión a internet.');
       throw err;
+    });
+}
+
+// Devuelve { registro, detalle }. Glimmer no tiene columna PROVEEDOR: se usa el REFERENTE
+// del Registro (TIPS CARGO SAC, ACP REPRESENTACION, etc.) y en Detalle se cruza por DOCUMENTO.
+function fetchSheetData(action) {
+  if (action !== 'all') return Promise.reject(new Error('Acción no soportada: ' + action));
+  return Promise.all([fetchCsv(REGISTRO_CSV_URL, 'Registro'), fetchCsv(DETALLE_CSV_URL, 'Detalle')])
+    .then(([reg, det]) => {
+      const provByDoc = {};
+      reg.forEach(r => {
+        const d = String(r['DOCUMENTO'] || '').trim(), p = String(r['REFERENTE'] || '').trim();
+        if (d && p && !provByDoc[d]) provByDoc[d] = p;
+      });
+      return {
+        registro: reg.map(r => ('PROVEEDOR' in r) ? r : { ...r, PROVEEDOR: String(r['REFERENTE'] || '').trim() }),
+        detalle:  det.map(r => ('PROVEEDOR' in r) ? r : { ...r, PROVEEDOR: provByDoc[String(r['DOCUMENTO'] || '').trim()] || '' })
+      };
     });
 }
 
 // ========== CARGA DE PLANTILLA (REGISTRO) ==========
 // Columnas esperadas de la plantilla, de la B a la T (la A = ID IMPOR se autogenera)
 const PLANTILLA_COLS = [
-  'TIPO','MES','ORD','PROVEEDOR','REFERENTE','INGRESO','DOCUMENTO',
+  'TIPO','MES','ORD','REFERENTE','INGRESO','DOCUMENTO',
   'Material Number','CODIGO','Article description','EAN 13','LOTE','EXPIRA',
   'QUANTITY','STOCK','Customs code','LINEA','CONDICION','CONDICION 2'
 ];
 
 // URL del Web App de Google Apps Script que escribe en el Google Sheet de Registro.
 // Debes desplegar el script (ver instrucciones) y pegar aquí la URL que te entregue.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxix3lzRb_tq8qMeh0fsHKf_tY-52ZFyBVtFGUzScFkeEAc_Q3N69yE4vp7O4pzGfUT1Q/exec';
-
-// ===== REGISTRO vía CSV publicado (evita que el Apps Script se cuelgue con la hoja grande) =====
-// Nota: Google actualiza los CSV publicados con unos minutos de retraso.
-const REGISTRO_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1508679406&single=true&output=csv';
-// Columnas que antes llegaban como número desde el Apps Script; el resto se deja como texto
-// (así EAN, LOTE, etc. conservan ceros a la izquierda).
-const REGISTRO_NUM_COLS = ['ID IMPOR', 'QUANTITY', 'STOCK', 'CANT'];
-
-const DETALLE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1518657548&single=true&output=csv';
-
-// Lee un CSV publicado. headerRegex valida que realmente sea la hoja esperada
-// (si Google devuelve una página de error, no se acepta como datos).
-function fetchPublishedCSV(url, headerRegex, numCols = [], timeoutMs = 45000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Tiempo de espera agotado leyendo el CSV publicado.')), timeoutMs);
-    Papa.parse(url + '&_=' + Date.now(), {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: function(res) {
-        clearTimeout(timer);
-        const fields = (res.meta && res.meta.fields) || [];
-        if (!headerRegex.test(fields.join('|'))) {
-          return reject(new Error('El CSV publicado no tiene las columnas esperadas.'));
-        }
-        const rows = (res.data || []).map(r => {
-          numCols.forEach(c => {
-            const v = r[c];
-            if (v !== undefined && v !== null && String(v).trim() !== '' && !isNaN(Number(v))) r[c] = Number(v);
-          });
-          return r;
-        });
-        resolve(rows);
-      },
-      error: function(err) {
-        clearTimeout(timer);
-        reject(new Error('No se pudo leer el CSV: ' + ((err && err.message) || err)));
-      }
-    });
-  });
-}
-function fetchRegistroCSV() { return fetchPublishedCSV(REGISTRO_CSV_URL, /ID IMPOR/i, REGISTRO_NUM_COLS); }
-function fetchDetalleCSV()  { return fetchPublishedCSV(DETALLE_CSV_URL,  /DOCUMENTO|REFERENTE/i); }
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6YGvnBEIZOxrSivdJh_hBcNDCQOIFr1hEuivX1Ax8UIPcUqcuE2K5rFrjrNFJY1A_/exec'; // escritura: plantilla y Registro Documentario
 
 function downloadPlantillaVacia() {
   const headers = ['ID IMPOR', ...PLANTILLA_COLS];
@@ -1152,7 +1072,7 @@ function downloadPlantillaVacia() {
     if (h === 'Material Number') return "14-00000343"; // ejemplo con guión, ya como texto
     if (h === 'QUANTITY') return 0;
     if (h === 'STOCK') return ''; // se autocompleta = QUANTITY, no llenar manualmente
-    if (h === 'TIPO') return 'CL'; // siempre CL, se fuerza igual aunque lo cambies
+    if (h === 'TIPO') return 'IMP'; // IMP o CL
     if (h === 'MES') return ''; // se calcula automático desde INGRESO, no llenar manualmente
     if (h === 'INGRESO') return '20250115'; // formato yyyymmdd
     return '';
@@ -1184,8 +1104,8 @@ function downloadPlantillaVacia() {
 
   setTimeout(() => {
     alert('📋 Plantilla descargada.\n\nIMPORTANTE:\n' +
-      '• La columna MATERIAL (F) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n' +
-      '• TIPO se guardará siempre como "CL", sin importar lo que escribas.\n' +
+      '• La columna Material Number (H) ya viene formateada como TEXTO para evitar que Excel convierta códigos como "14-00000343" en números.\n' +
+      '• TIPO: IMP (importación) o CL (compra local).\n' +
       '• MES se calcula automáticamente a partir de INGRESO, no es necesario llenarlo.\n' +
       '• INGRESO debe ir en formato AAAAMMDD (ej: 20250115), como texto.\n' +
       '• STOCK se autocompleta siempre con el valor de QUANTITY, no es necesario llenarlo.\n\n' +
@@ -1228,8 +1148,8 @@ function handlePlantillaUpload(event) {
       // de resta, el código original puede sobrevivir en cell.f (la fórmula).
       const range = XLSX.utils.decode_range(ws['!ref']);
       const aoa = [];
-      // Índice de columna F (MATERIAL) = 5 (A=0,B=1,C=2,D=3,E=4,F=5)
-      const MATERIAL_COL_INDEX = 5;
+      // Índice de columna H (Material Number) = 7
+      const MATERIAL_COL_INDEX = 7;
       let materialCorrupted = false;
 
       for (let r = range.s.r; r <= range.e.r; r++) {
@@ -1263,9 +1183,9 @@ function handlePlantillaUpload(event) {
 
       if (materialCorrupted) {
         alert('⚠️ ATENCIÓN: Excel convirtió algunos códigos de MATERIAL en números (ej: "14-00000343" se perdió y quedó como un número).\n\n' +
-          'Esto ocurre cuando la columna F (MATERIAL) no está formateada como TEXTO en tu Excel.\n\n' +
+          'Esto ocurre cuando la columna H (Material Number) no está formateada como TEXTO en tu Excel.\n\n' +
           'Para solucionarlo de forma permanente:\n' +
-          '1. Selecciona toda la columna F en tu plantilla\n' +
+          '1. Selecciona toda la columna H en tu plantilla\n' +
           '2. Clic derecho → Formato de celdas → Texto\n' +
           '3. Vuelve a escribir o pegar los códigos de MATERIAL\n' +
           '4. Guarda y vuelve a cargar el archivo\n\n' +
@@ -1296,8 +1216,8 @@ function handlePlantillaUpload(event) {
           // evitando que Excel/SheetJS lo interprete como número o notación científica.
           obj[col] = val;
         });
-        // TIPO siempre "CL", sin importar lo que venga en el archivo
-        obj['TIPO'] = 'CL';
+        // TIPO: IMP o CL (por defecto CL si viene vacío)
+        obj['TIPO'] = String(obj['TIPO'] || '').toUpperCase() || 'CL';
 
         // MES se calcula SIEMPRE desde INGRESO (formato AAAAMMDD), se ignora lo que venga en el archivo
         obj['MES'] = mesFromIngresoYYYYMMDD(obj['INGRESO']);
@@ -1314,7 +1234,7 @@ function handlePlantillaUpload(event) {
       document.getElementById('plantillaModalText').innerHTML =
         `Se detectaron <strong>${pendingPlantillaRows.length}</strong> fila(s) en el archivo <strong>${file.name}</strong>.<br><br>
         Se asignará un ID IMPOR correlativo automático. Además:<br>
-        • TIPO se guardará como <strong>"CL"</strong><br>
+        • TIPO: IMP o CL (CL si va vacío)<br>
         • MES se calculará desde INGRESO (AAAAMMDD)<br>
         • STOCK se igualará a QUANTITY<br>
         • CONDICION 2 se completará con <strong>"LOTIZADO"</strong><br><br>
@@ -1421,19 +1341,12 @@ function onSearch() {
 // ========== LOAD DATA ==========
 async function loadAllData() {
   document.getElementById('syncStatus').textContent = 'Sincronizando...';
+  loadMovimientos(); // carga independiente (tiene su propio manejo de errores)
   try {
-    // Registro y Detalle: CSV publicado (rápido y estable). Si fallan, se intenta el Apps Script (hasta 90 s).
-    const regPromise = fetchRegistroCSV().catch(e => {
-      console.warn('CSV de Registro falló, intento con Apps Script:', e);
-      return fetchSheetData('registro', 90000);
-    });
-    const detPromise = fetchDetalleCSV().catch(e => {
-      console.warn('CSV de Detalle falló, intento con Apps Script:', e);
-      return fetchSheetData('detalle', 90000);
-    });
-    const [regRaw, detRaw] = await Promise.all([regPromise, detPromise]);
-    const reg = regRaw || [];
-    const det = detRaw || [];
+    const all = await fetchSheetData('all');
+    if (all && !Array.isArray(all) && all.error) throw new Error(all.error);
+    const reg = all.registro || [];
+    const det = all.detalle  || [];
 
     registroData = reg.map(r => ({ ...r, 'ESTATUS STOCK': calcEstatusStock(r) }));
     detalleData  = det;
@@ -1502,69 +1415,28 @@ function _getKeyPairs(row) {
   let pairs = _rowKeyPairsCache.get(row);
   if (!pairs) {
     pairs = Object.keys(row).map(k => ({ k, kn: k.trim().toUpperCase() }));
-    pairs.shape = _shapeFor(pairs);
     _rowKeyPairsCache.set(row, pairs);
   }
   return pairs;
 }
 
-
-// ===== Paginación (200 filas por bloque) + índice de búsqueda =====
-const PAGE_SIZE = 200;
-const _lim = { registro: PAGE_SIZE, ticket: PAGE_SIZE, detalle: PAGE_SIZE };
-const _lastRows = {};
-let _keepLim = false;
-const _rowTextCache = new WeakMap();
-function _rowText(r) {
-  let t = _rowTextCache.get(r);
-  if (t === undefined) { t = Object.values(r).join(' ').toLowerCase(); _rowTextCache.set(r, t); }
-  return t;
-}
-function _pgStart(key, rows) {
-  if (!_keepLim) _lim[key] = PAGE_SIZE;
-  _keepLim = false;
-  _lastRows[key] = rows;
-}
-const _pgFns = {};
-function _pgMore(key) {
-  _lim[key] += PAGE_SIZE; _keepLim = true;
-  _pgFns[key](_lastRows[key]);
-}
-let _pgObserver = null;
-function _moreRow(key, total, cols) {
-  if (total <= _lim[key]) return '';
-  setTimeout(() => {
-    const el = document.getElementById('more-' + key);
-    if (!el) return;
-    if (!_pgObserver) _pgObserver = new IntersectionObserver(es => es.forEach(e => {
-      if (e.isIntersecting) { _pgObserver.unobserve(e.target); _pgMore(e.target.dataset.key); }
-    }), { rootMargin: '300px' });
-    _pgObserver.observe(el);
-  }, 0);
-  return `<tr id="more-${key}" data-key="${key}"><td colspan="${cols}" class="px-lg py-md text-center text-on-surface-variant text-[12px]">Mostrando ${_lim[key].toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} · <button class="underline text-primary font-semibold" onclick="_pgMore('${key}')">Mostrar más</button></td></tr>`;
-}
-
-const _shapes = new Map();
-function _shapeFor(pairs) {
-  const sig = pairs.map(p => p.k).join('\u0001');
-  let sh = _shapes.get(sig);
-  if (!sh) { sh = { res: new Map() }; _shapes.set(sig, sh); }
-  return sh;
-}
-function _resolveKey(pairs, names) {
-  const namesUpper = names.map(n => n.toUpperCase());
-  for (const { k, kn } of pairs) for (const nu of namesUpper) if (kn === nu) return k;      // exacto primero
-  for (const { k, kn } of pairs) for (const nu of namesUpper) if (kn.includes(nu)) return k; // luego "contiene"
-  return null;
-}
 function colVal(row, names) {
   if (!row || typeof row !== 'object') return '';
   const pairs = _getKeyPairs(row);
-  const nk = names.join('|');
-  let k = pairs.shape.res.get(nk);
-  if (k === undefined) { k = _resolveKey(pairs, names); pairs.shape.res.set(nk, k); }
-  if (k === null) return '';
-  return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+  const namesUpper = names.map(n => n.toUpperCase());
+  // Exact match first
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn === nu) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+    }
+  }
+  // Fallback: includes
+  for (const { k, kn } of pairs) {
+    for (const nu of namesUpper) {
+      if (kn.includes(nu)) return String(row[k] == null ? '' : row[k]).replace(/[\r\n]+/g, ' ').trim();
+    }
+  }
+  return '';
 }
 
 // Derivar MES desde columna REGISTRO (formato: DD/MM/YYYY HH:MM:SS), cacheado por fila
@@ -1673,7 +1545,7 @@ function filterRegistro() {
       if (docKey && !String(r[docKey]||'').toLowerCase().includes(doc)) return false;
     }
     if (q) {
-      if (!_rowText(r).includes(q)) return false;
+      if (!Object.values(r).join(' ').toLowerCase().includes(q)) return false;
     }
     return true;
   });
@@ -1769,7 +1641,6 @@ const NUM_COLS   = ['CANT.','CANT','CANTIDAD','QUANTITY','ORD'];
 
 function renderRegistroTable(rows) {
   const tbody = document.getElementById('registroBody');
-  _pgStart('registro', rows);
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="${registroKeys.length + 1}" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>`;
     document.getElementById('registroCount').textContent = '0 registros';
@@ -1777,7 +1648,7 @@ function renderRegistroTable(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.slice(0, _lim.registro).map((r, i) => {
+  tbody.innerHTML = rows.map((r, i) => {
     const isSelected = selectedRegistroRows.has(i);
     const cells = registroKeys.map(k => {
       const v = r[k] || '';
@@ -1813,7 +1684,7 @@ function renderRegistroTable(rows) {
         return `<td class="px-md py-sm text-on-surface-variant text-[13px] max-w-[180px] truncate" title="${v}">${v}</td>`;
       }
       return `<td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${v}</td>`;
-    }).join('') + _moreRow('registro', rows.length, registroKeys.length + 1);
+    }).join('');
 
     return `<tr class="hover:bg-blue-50/40 transition-colors ${isSelected ? 'bg-blue-50' : ''}">
       <td class="px-md py-sm">
@@ -1825,7 +1696,6 @@ function renderRegistroTable(rows) {
 
   document.getElementById('registroCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
 }
-_pgFns.registro = renderRegistroTable;
 
 // ========== TICKET (resumen agrupado por ORD, a partir de Registro) ==========
 let ticketData = [];
@@ -2007,7 +1877,6 @@ function fmtFechaCorta(d) {
 
 function renderTicketTable(rows) {
   const tbody = document.getElementById('ticketBody');
-  _pgStart('ticket', rows);
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('ticketCount').textContent = '0 tickets';
@@ -2015,7 +1884,7 @@ function renderTicketTable(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.slice(0, _lim.ticket).map(t => {
+  tbody.innerHTML = rows.map(t => {
     const mesCap = t.mes ? String(t.mes).charAt(0).toUpperCase() + String(t.mes).slice(1) : '—';
     const cls = TICKET_ESTATUS_STYLES[String(t.estatus).toUpperCase()] || 'bg-gray-100 text-gray-600';
     const ltCls = LEAD_TIME_STYLES[t.leadTimeLevel] || LEAD_TIME_STYLES.none;
@@ -2033,7 +1902,7 @@ function renderTicketTable(rows) {
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${t.estatus || '—'}</span></td>
       <td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${ltCls}">${t.leadTime || '—'}</span></td>
     </tr>`;
-  }).join('') + _moreRow('ticket', rows.length, 12);
+  }).join('');
 
   const totalRecibida = rows.reduce((s, t) => s + t.recibida, 0);
   const totalIngresada = rows.reduce((s, t) => s + t.ingresada, 0);
@@ -2041,7 +1910,6 @@ function renderTicketTable(rows) {
   document.getElementById('ticketTotal').textContent =
     'Recibido: ' + totalRecibida.toLocaleString('es-PE') + ' / Ingresado: ' + totalIngresada.toLocaleString('es-PE');
 }
-_pgFns.ticket = renderTicketTable;
 
 function exportTicket() {
   const rows = (ticketFiltered.length ? ticketFiltered : ticketData).map(t => ({
@@ -2407,14 +2275,13 @@ function sortDetalle(col) {
 
 function renderDetalleTable(rows) {
   const tbody = document.getElementById('detalleBody');
-  _pgStart('detalle', rows);
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>';
     document.getElementById('detalleCount').textContent = '0 registros';
     document.getElementById('detalleTotal').textContent = '';
     return;
   }
-  tbody.innerHTML = rows.slice(0, _lim.detalle).map((r, i) => {
+  tbody.innerHTML = rows.map((r, i) => {
     const mes  = getMesFromRegistro(r);
     const mesCap = mes ? mes.charAt(0).toUpperCase() + mes.slice(1) : '—';
     const fec  = colVal(r, ['REGISTRO']).split(' ')[0];
@@ -2446,13 +2313,12 @@ function renderDetalleTable(rows) {
       <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px]">${exp}</td>
       <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(qty||0).toLocaleString('es-PE')}</td>
     </tr>`;
-  }).join('') + _moreRow('detalle', rows.length, 12);
+  }).join('');
 
   const total = rows.reduce((s, r) => s + getCantidad(r), 0);
   document.getElementById('detalleCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
   document.getElementById('detalleTotal').textContent = 'Total: ' + total.toLocaleString('es-PE') + ' uds.';
 }
-_pgFns.detalle = renderDetalleTable;
 
 // ========== RENDER PANEL (charts based on DETALLE) ==========
 function renderPanel() {
@@ -3095,19 +2961,7 @@ function exportKPISelected() {
 }
 
 
-// ========== HORIZONTE (CSV público de Google Sheets) ==========
-// Fuente: hoja publicada como CSV. Columnas esperadas:
-// FECHA DE LLEGADA | PROVEEDOR | OC | HORA | CODIGOS | UNIDADES
-const HORIZONTE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQgn1Yp4-QseqM82ZqboVRImdNiFIx5kJLfO8ALa5nml7yqKSi9-HCWygRTHW932b7m06Jq2bG09QJA/pub?gid=1261767277&single=true&output=csv';
-
-let horizonteData = [];
-let horizonteFiltered = [];
-let horizonteSortCol = 'fecha';
-let horizonteSortDir = 1;
-let chartHorizonte = null;
-let horizonteCalMonth = new Date(); // mes actualmente mostrado en el calendario visual
-let horizonteFirstLoad = true; // controla si se aplica el rango de "esta semana" por defecto
-
+// ========== HELPERS DE FECHA ==========
 function dateToInputStr(d) {
   const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
@@ -3122,354 +2976,9 @@ function parseFechaDDMMYYYY(str) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function loadHorizonte() {
-  const tbody = document.getElementById('horizonteBody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>';
-
-  Papa.parse(HORIZONTE_CSV_URL, {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: function(results) {
-      horizonteData = (results.data || []).map(raw => {
-        const row = {};
-        Object.keys(raw).forEach(k => { row[k.trim().toUpperCase()] = raw[k]; });
-        const fechaStr = (row['FECHA DE LLEGADA'] || '').toString().trim();
-        const fechaObj = parseFechaDDMMYYYY(fechaStr);
-        return {
-          fecha:     fechaStr,
-          fechaObj:  fechaObj,
-          proveedor: (row['PROVEEDOR'] || '').toString().trim(),
-          oc:        (row['OC'] || '').toString().trim(),
-          hora:      (row['HORA'] || '').toString().trim(),
-          codigos:   parseFloat(String(row['CODIGOS']  || '').replace(/[^0-9.-]/g, '')) || 0,
-          unidades:  parseFloat(String(row['UNIDADES'] || '').replace(/[^0-9.-]/g, '')) || 0,
-        };
-      }).filter(r => r.fechaObj); // solo filas con fecha válida
-
-      if (horizonteFirstLoad) {
-        // Primera carga: por defecto se muestra el rango de esta semana (Lun-Dom)
-        horizonteFirstLoad = false;
-        setHorizontePreset('semana');
-      } else {
-        // Actualizaciones posteriores respetan los filtros que el usuario ya tenga puestos
-        filterHorizonte();
-      }
-    },
-    error: function(err) {
-      console.error(err);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-error">⚠️ Error al cargar Horizonte. Verifica que la hoja esté publicada como CSV.</td></tr>';
-    }
-  });
-}
-
-function setHorizontePreset(kind) {
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const toInput = dateToInputStr;
-  let desde = '', hasta = '';
-  if (kind === 'hoy') {
-    desde = toInput(hoy); hasta = toInput(hoy);
-  } else if (kind === 'semana') {
-    const dow = hoy.getDay() === 0 ? 7 : hoy.getDay(); // Lunes=1 ... Domingo=7
-    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (dow - 1));
-    const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
-    desde = toInput(lunes); hasta = toInput(domingo);
-  } else if (kind === 'mes') {
-    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const ultimo  = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    desde = toInput(primero); hasta = toInput(ultimo);
-  } else {
-    desde = ''; hasta = '';
-  }
-  document.getElementById('horDesde').value = desde;
-  document.getElementById('horHasta').value = hasta;
-  filterHorizonte();
-}
-
-function clearHorizonteFilters() {
-  // "Limpiar filtros" vuelve al rango de seguimiento semanal (Lun-Dom de esta semana),
-  // no a "todo": el filtro de fechas libre se reserva para consultas puntuales.
-  document.getElementById('horProveedor').value = '';
-  setHorizontePreset('semana');
-}
-
-function sortHorizonte(col) {
-  if (horizonteSortCol === col) horizonteSortDir *= -1;
-  else { horizonteSortCol = col; horizonteSortDir = 1; }
-  filterHorizonte();
-}
-
-function filterHorizonte() {
-  const desdeStr = document.getElementById('horDesde')?.value || '';
-  const hastaStr = document.getElementById('horHasta')?.value || '';
-  const prov = (document.getElementById('horProveedor')?.value || '').toLowerCase();
-
-  const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null;
-  const hasta = hastaStr ? new Date(hastaStr + 'T23:59:59') : null;
-
-  let rows = horizonteData.filter(r => {
-    if (desde && r.fechaObj < desde) return false;
-    if (hasta && r.fechaObj > hasta) return false;
-    if (prov && !r.proveedor.toLowerCase().includes(prov)) return false;
-    return true;
-  });
-
-  rows.sort((a, b) => {
-    let va, vb;
-    if (horizonteSortCol === 'fecha') { va = a.fechaObj; vb = b.fechaObj; }
-    else { va = a[horizonteSortCol]; vb = b[horizonteSortCol]; }
-    if (typeof va === 'string') va = va.toLowerCase();
-    if (typeof vb === 'string') vb = vb.toLowerCase();
-    if (va < vb) return -1 * horizonteSortDir;
-    if (va > vb) return  1 * horizonteSortDir;
-    return 0;
-  });
-
-  horizonteFiltered = rows;
-
-  // Actualizar flechas de orden en encabezados
-  ['fecha','proveedor','oc','hora','codigos','unidades'].forEach(c => {
-    const el = document.getElementById('hsort-' + c);
-    if (el) el.textContent = (c === horizonteSortCol) ? (horizonteSortDir === 1 ? '▲' : '▼') : '';
-  });
-
-  renderHorizonteTable(rows);
-  renderHorizonteChart(rows);
-  renderHorizonteCalendar();
-}
-
-function shiftHorizonteMonth(delta) {
-  horizonteCalMonth = new Date(horizonteCalMonth.getFullYear(), horizonteCalMonth.getMonth() + delta, 1);
-  renderHorizonteCalendar();
-}
-
-function selectHorizonteDay(iso) {
-  document.getElementById('horDesde').value = iso;
-  document.getElementById('horHasta').value = iso;
-  filterHorizonte();
-}
-
-function renderHorizonteCalendar() {
-  const label = document.getElementById('horCalLabel');
-  const grid  = document.getElementById('horCalGrid');
-  if (!label || !grid) return;
-
-  const year  = horizonteCalMonth.getFullYear();
-  const month = horizonteCalMonth.getMonth();
-  const mesCap = MESES_ES[month].charAt(0).toUpperCase() + MESES_ES[month].slice(1);
-  label.textContent = mesCap + ' ' + year;
-
-  // Suma de unidades por día (del dataset completo, no solo lo filtrado, para ver todo el mes)
-  const byDate = {};
-  horizonteData.forEach(r => {
-    if (r.fechaObj && r.fechaObj.getFullYear() === year && r.fechaObj.getMonth() === month) {
-      const key = r.fechaObj.getDate();
-      byDate[key] = (byDate[key] || 0) + r.unidades;
-    }
-  });
-
-  const desdeStr = document.getElementById('horDesde')?.value || '';
-  const hastaStr = document.getElementById('horHasta')?.value || '';
-
-  const firstDay = new Date(year, month, 1);
-  const startWeekday = (firstDay.getDay() + 6) % 7; // 0 = Lunes
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const hoyIso = dateToInputStr(new Date());
-
-  let cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push('<div></div>');
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(year, month, d);
-    const iso = dateToInputStr(dateObj);
-    const unidades = byDate[d];
-    const hasData = unidades != null;
-
-    let inRange = true;
-    if (desdeStr && iso < desdeStr) inRange = false;
-    if (hastaStr && iso > hastaStr) inRange = false;
-
-    const classes = ['rounded-lg','py-xs','text-[12px]','cursor-pointer','transition-all',
-      'flex','flex-col','items-center','justify-center','h-12','relative'];
-
-    if (hasData && inRange)      classes.push('font-bold text-on-tertiary-fixed-variant');
-    else if (hasData)            classes.push('bg-surface-container-high text-on-surface-variant font-semibold hover:bg-secondary-container/40');
-    else                          classes.push('text-on-surface-variant/50 hover:bg-surface-container-high');
-
-    if (iso === hoyIso) classes.push('ring-2 ring-primary ring-offset-1');
-
-    const style = (hasData && inRange) ? 'style="background:#fdbc13"' : '';
-    const unidadesLabel = hasData
-      ? (unidades >= 1000 ? (unidades/1000).toFixed(1) + 'k' : unidades.toLocaleString('es-PE'))
-      : '';
-
-    cells.push(`<div class="${classes.join(' ')}" ${style} onclick="selectHorizonteDay('${iso}')" title="${hasData ? unidades.toLocaleString('es-PE') + ' unidades' : 'Sin llegadas'}">
-      <span>${d}</span>
-      ${hasData ? `<span class="text-[9px] leading-none mt-0.5">${unidadesLabel}</span>` : ''}
-    </div>`);
-  }
-
-  grid.innerHTML = cells.join('');
-}
-
-function renderHorizonteTable(rows) {
-  const tbody = document.getElementById('horizonteBody');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados</td></tr>';
-    document.getElementById('horizonteCount').textContent = '0 registros';
-    document.getElementById('horizonteTotal').textContent = '';
-    return;
-  }
-  tbody.innerHTML = rows.map(r => `
-    <tr class="hover:bg-blue-50/40 transition-colors">
-      <td class="px-md py-sm font-mono-data text-[12px] text-on-surface font-semibold whitespace-nowrap">${r.fecha || '—'}</td>
-      <td class="px-md py-sm text-on-surface text-[13px] max-w-[220px] truncate" title="${r.proveedor}">${r.proveedor || '—'}</td>
-      <td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${r.oc || '—'}</td>
-      <td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${r.hora || '—'}</td>
-      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.codigos.toLocaleString('es-PE')}</td>
-      <td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${r.unidades.toLocaleString('es-PE')}</td>
-    </tr>
-  `).join('');
-
-  const totalUnidades = rows.reduce((s, r) => s + r.unidades, 0);
-  document.getElementById('horizonteCount').textContent = rows.length.toLocaleString('es-PE') + ' registros';
-  document.getElementById('horizonteTotal').textContent = 'Total Unidades: ' + totalUnidades.toLocaleString('es-PE') + ' uds.';
-}
-
-// Paleta de 10 tonos (todos dentro de la familia del dorado/ámbar),
-// suficiente para hasta 10 proveedores por día.
-const HORIZONTE_PALETTE = [
-  '#fff3bf', '#ffe066', '#ffd43b', '#fcc419', '#fab005',
-  '#f59f00', '#e8a33d', '#d9822b', '#c76e00', '#a35700'
-];
-
-function renderHorizonteChart(rows) {
-  // Agrupar por fecha, y dentro de cada fecha por PROVEEDOR (sumando todas sus OC del día)
-  const porFecha = {};
-  rows.forEach(r => {
-    const fKey = r.fecha || '—';
-    if (!porFecha[fKey]) porFecha[fKey] = { fechaObj: r.fechaObj, porProveedor: {} };
-    const pKey = r.proveedor || '—';
-    if (!porFecha[fKey].porProveedor[pKey]) {
-      porFecha[fKey].porProveedor[pKey] = { proveedor: pKey, unidades: 0, ocs: [], horas: [] };
-    }
-    const g = porFecha[fKey].porProveedor[pKey];
-    g.unidades += r.unidades;
-    if (r.oc)   g.ocs.push(r.oc);
-    if (r.hora) g.horas.push(r.hora);
-  });
-
-  const fechas = Object.keys(porFecha).sort((a, b) => porFecha[a].fechaObj - porFecha[b].fechaObj);
-  fechas.forEach(f => {
-    porFecha[f].items = Object.values(porFecha[f].porProveedor).sort((a, b) => {
-      const ha = [...a.horas].sort()[0] || '';
-      const hb = [...b.horas].sort()[0] || '';
-      return ha.localeCompare(hb);
-    });
-  });
-
-  const maxProveedores = fechas.length
-    ? Math.min(10, Math.max(...fechas.map(f => porFecha[f].items.length)))
-    : 0;
-
-  // Etiqueta de 2 líneas: fecha arriba, cantidad de proveedores únicos abajo
-  const labels = fechas.map(f => {
-    const fo = porFecha[f].fechaObj;
-    const fechaCorta = fo ? fo.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) : f;
-    const n = porFecha[f].items.length;
-    return [fechaCorta, `${n} proveedor${n !== 1 ? 'es' : ''}`];
-  });
-
-  // Un dataset por "posición" de proveedor dentro del día (1er proveedor, 2do, ...),
-  // cada uno con un tono distinto de la paleta dorada.
-  const datasets = [];
-  for (let i = 0; i < maxProveedores; i++) {
-    datasets.push({
-      label: 'Proveedor ' + (i + 1),
-      data: fechas.map(f => {
-        const item = porFecha[f].items[i];
-        return item ? item.unidades : null;
-      }),
-      _meta: fechas.map(f => porFecha[f].items[i] || null),
-      backgroundColor: HORIZONTE_PALETTE[i % HORIZONTE_PALETTE.length],
-      borderRadius: 4,
-      maxBarThickness: 36
-    });
-  }
-
-  const canvas = document.getElementById('horizonteChart');
-  const inner  = document.getElementById('horizonteChartInner');
-  if (!canvas) return;
-
-  // Ancho dinámico según cantidad de fechas y proveedores por día
-  if (inner) {
-    const anchoPorFecha = Math.max(maxProveedores * 26, 70);
-    const minWidthPx = Math.max(fechas.length * anchoPorFecha, 100);
-    inner.style.minWidth = fechas.length > 6 ? minWidthPx + 'px' : '100%';
-  }
-
-  const ctx = canvas.getContext('2d');
-  if (chartHorizonte) chartHorizonte.destroy();
-  chartHorizonte = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#181c20',
-          titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' }, padding: 12,
-          callbacks: {
-            title: items => {
-              const it = items[0];
-              const meta = it.dataset._meta ? it.dataset._meta[it.dataIndex] : null;
-              return meta ? meta.proveedor : '';
-            },
-            label: ctx => {
-              const meta = ctx.dataset._meta ? ctx.dataset._meta[ctx.dataIndex] : null;
-              if (!meta) return 'Unidades: ' + (ctx.parsed.y ?? 0).toLocaleString('es-PE');
-              const lines = ['Unidades: ' + meta.unidades.toLocaleString('es-PE')];
-              if (meta.ocs.length)   lines.push('OC: ' + meta.ocs.join(', '));
-              if (meta.horas.length) lines.push('Hora: ' + [...new Set(meta.horas)].join(', '));
-              return lines;
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          grid: { color: '#ebeef4', drawBorder: false },
-          ticks: { color: '#727785', font: { family: 'JetBrains Mono', size: 10 } }
-        },
-        x: {
-          grid: { display: false },
-          ticks: { color: '#727785', font: { family: 'Inter', weight: '600', size: 10 }, autoSkip: false, maxRotation: 0, minRotation: 0 }
-        }
-      }
-    }
-  });
-}
-
-function exportHorizonte() {
-  const rows = (horizonteFiltered.length ? horizonteFiltered : horizonteData).map(r => ({
-    'FECHA DE LLEGADA': r.fecha,
-    'PROVEEDOR': r.proveedor,
-    'OC': r.oc,
-    'HORA': r.hora,
-    'CODIGOS': r.codigos,
-    'UNIDADES': r.unidades
-  }));
-  const hoy = new Date();
-  const fecha = `${hoy.getDate().toString().padStart(2,'0')}${(hoy.getMonth()+1).toString().padStart(2,'0')}${hoy.getFullYear()}`;
-  downloadXLSX(`Horizonte_${fecha}.xlsx`, rows, 'Horizonte');
-}
-
-
 // ========== REGISTRO DOCUMENTARIO ==========
 // Fuente CSV publicada de Google Sheets
-const REGDOC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQiQcuo3jQbyzIlGf6R060pk9Iq2FkaSyTQYV3cx9XzdPT_UlXjdKCzZJNdVNZWGxlinY1De1xi-RD1/pub?gid=1471400494&single=true&output=csv';
+const REGDOC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRou8JP92n2PEaxvICAezyEI97CMOn41Sgt398wkFfklfZaIMN7DKKC9OJYBMhQmsdnCQKfcL9GTdTH/pub?gid=1471400494&single=true&output=csv';
 
 // URL del Google Apps Script (Web App) que escribe LEADTIME / ESTATUS ALMACEN / REGISTRO DE ALMACEN
 // de vuelta en la hoja. Es el MISMO Apps Script que ya usas para Registro/Detalle
@@ -3550,12 +3059,12 @@ function loadRegistroDocumentario() {
     complete: function(results) {
       regdocRaw = (results.data || []).map(raw => {
         const idDoc = colVal(raw, ['ID DOC']);
-        const registroTicketStr = colVal(raw, ['REGISTRO DE TICKET']);
+        const registroTicketStr = colVal(raw, ['REGISTRO']);
         return {
           idDoc,
           registroTicket: registroTicketStr,
           registroTicketDate: parseFechaHoraDDMMYYYY(registroTicketStr),
-          docGuia: colVal(raw, ['DOC. GUIA', 'DOC GUIA', 'DOC. GUÍA']),
+          docGuia: colVal(raw, ['DOC. GUIA', 'DOC, GUIA', 'DOC GUIA', 'DOC. GUÍA']),
           referencia: colVal(raw, ['REFERENCIA']),
           oc: colVal(raw, ['OC']),
           ticket: colVal(raw, ['TICKET']),
@@ -3710,7 +3219,7 @@ function grabarRegdoc(idDoc) {
   renderRegdoc();
 
   // 2) Envío al Google Apps Script para que quede también en la hoja de cálculo
-  if (!REGDOC_SAVE_URL) {
+  if (!REGDOC_SAVE_URL || REGDOC_SAVE_URL.includes('PEGA_AQUI')) {
     console.warn('REGDOC_SAVE_URL no configurada: el registro solo quedó guardado en esta app, no en el Google Sheet.');
     return;
   }
@@ -3730,13 +3239,246 @@ function grabarRegdoc(idDoc) {
     });
 }
 
+// ========== MOVIMIENTOS ==========
+const MOV_CSV_URL   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRou8JP92n2PEaxvICAezyEI97CMOn41Sgt398wkFfklfZaIMN7DKKC9OJYBMhQmsdnCQKfcL9GTdTH/pub?gid=552535923&single=true&output=csv';
+const SALDO_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0j0wNt1izjNQdp1SAQYbtVz2n1hiZkUVvGC8Q4AbGgxOoITwNMbxUJ4KrKcYyM8QhIF4srhmNeYND/pub?gid=273620597&single=true&output=csv';
+
+// Columnas de la plantilla TRFMAN (las de cabecera azul en la hoja: NOM_USUARIO ... RCOM)
+const TRFMAN_COLS = ['NOM_USUARIO','TIPO','RCCUS','RFRWH','RTOWH','RBPRD','RBLOT','RQTYT','RFRLC','RTOLC','RRSNC','RNDOC','RCOM'];
+// Columnas visibles. k = clave normalizada (sin espacios, mayúsculas); h = título mostrado
+const MOV_COLS = [
+  { k:'ID', h:'ID' }, { k:'REGISTRO', h:'REGISTRO' }, { k:'REFERENCIA', h:'REFERENCIA' }, { k:'ESTATUS', h:'ESTATUS' },
+  { k:'LOTEFISICO', h:'LOTE FISICO' }, { k:'SL', h:'SL' }, { k:'EAN14', h:'EAN14' },
+  ...TRFMAN_COLS.map(c => ({ k:c, h:c, tpl:true }))
+];
+
+let movData = [], movFiltered = [], saldoIdx = {};
+const movSelected = new Set();
+const filterMovDebounced = debounce(() => filterMov());
+
+const movNormKey = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+const movNormLote = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+const movEsc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// Índice del saldo: CODIGO|LOTE FISICO -> [{ ubic, bpcs, saldo }]
+function buildSaldoIndex(rows) {
+  saldoIdx = {};
+  rows.forEach(r => {
+    const o = {};
+    Object.keys(r).forEach(k => { o[movNormKey(k)] = String(r[k] == null ? '' : r[k]).trim(); });
+    const code = (o['CODIGO'] || '').toUpperCase();
+    const bpcs = o['LOTEBPCS'] || '';
+    if (!code || !bpcs) return;
+    const key = code + '|' + movNormLote(o['LOTEFISICO']);
+    (saldoIdx[key] = saldoIdx[key] || []).push({
+      ubic: (o['UBICACIÓN'] || o['UBICACION'] || '').toUpperCase(),
+      bpcs,
+      saldo: parseFloat(o['SALDO']) || 0
+    });
+  });
+}
+
+// Busca el LOTE BPCS: 1) mismo código+lote físico+ubicación destino (RTOLC)
+// 2) mismo código+lote físico (si hay un único LOTE BPCS)  3) ambiguo -> el de mayor saldo
+function resolveLoteBpcs(o) {
+  const code = (o.RBPRD || '').toUpperCase();
+  const cands = saldoIdx[code + '|' + movNormLote(o.LOTEFISICO)] || [];
+  if (!cands.length) return { lote: '', src: 'none' };
+  const ubic = (o.RTOLC || '').toUpperCase();
+  const exact = cands.filter(c => c.ubic === ubic).sort((a, b) => b.saldo - a.saldo);
+  if (exact.length) {
+    const n = new Set(exact.map(c => c.bpcs)).size;
+    return { lote: exact[0].bpcs, src: n === 1 ? 'exact' : 'amb' };
+  }
+  const uniq = [...new Set(cands.map(c => c.bpcs))];
+  if (uniq.length === 1) return { lote: uniq[0], src: 'lote' };
+  return { lote: cands.slice().sort((a, b) => b.saldo - a.saldo)[0].bpcs, src: 'amb' };
+}
+
+async function loadMovimientos() {
+  const body = document.getElementById('movBody');
+  if (body) body.innerHTML = '<tr><td class="px-lg py-xl text-center text-on-surface-variant">Cargando datos...</td></tr>';
+  try {
+    const [mov, saldo] = await Promise.all([fetchCsv(MOV_CSV_URL, 'Movimientos'), fetchCsv(SALDO_CSV_URL, 'Saldo')]);
+    buildSaldoIndex(saldo);
+    movData = mov.map(r => {
+      const o = {};
+      Object.keys(r).forEach(k => { o[movNormKey(k)] = String(r[k] == null ? '' : r[k]).trim(); });
+      return o;
+    }).filter(o => o.ID);
+    movData.forEach(o => {
+      o._date = parseFechaHoraDDMMYYYY(o.REGISTRO);
+      const m = resolveLoteBpcs(o);
+      o._rblot = o.RBLOT || m.lote;
+      o._src = o.RBLOT ? 'sheet' : m.src;
+    });
+    movData.sort((a, b) => (b._date ? b._date.getTime() : 0) - (a._date ? a._date.getTime() : 0));
+    renderMovHead();
+    filterMov();
+  } catch (e) {
+    console.error(e);
+    if (body) body.innerHTML = '<tr><td class="px-lg py-lg text-center text-error">⚠️ Error al cargar Movimientos: ' + movEsc(e.message) + '</td></tr>';
+  }
+}
+
+function renderMovHead() {
+  document.getElementById('movHead').innerHTML = '<tr>' +
+    '<th class="px-md py-md w-10 bg-surface-container-low"><input id="movCheckAll" type="checkbox" onchange="toggleAllMov(this)" class="rounded border-outline-variant text-primary cursor-pointer"/></th>' +
+    MOV_COLS.map(c => c.tpl
+      ? `<th class="px-md py-md font-label-md text-label-md text-white whitespace-nowrap" style="background:#1a4f91">${c.h}</th>`
+      : `<th class="px-md py-md font-label-md text-label-md text-on-surface-variant whitespace-nowrap bg-surface-container-low">${c.h}</th>`
+    ).join('') + '</tr>';
+}
+
+function filterMov() {
+  const desde = document.getElementById('movDesde').value;
+  const hasta = document.getElementById('movHasta').value;
+  const cod   = document.getElementById('movCodigo').value.trim().toLowerCase();
+  const ref   = document.getElementById('movReferencia').value.trim().toLowerCase();
+  const dDesde = desde ? new Date(desde + 'T00:00:00') : null;
+  const dHasta = hasta ? new Date(hasta + 'T23:59:59') : null;
+
+  movFiltered = movData.filter(r => {
+    if (dDesde && (!r._date || r._date < dDesde)) return false;
+    if (dHasta && (!r._date || r._date > dHasta)) return false;
+    if (cod && !(r.RBPRD + ' ' + r.SL).toLowerCase().includes(cod)) return false;
+    if (ref && !(r.REFERENCIA || '').toLowerCase().includes(ref)) return false;
+    return true;
+  });
+  movSelected.clear();
+  updateMovBulkBar();
+  renderMovTable();
+}
+
+function clearMovFilters() {
+  ['movDesde','movHasta','movCodigo','movReferencia'].forEach(id => { document.getElementById(id).value = ''; });
+  filterMov();
+}
+
+const MOV_ESTATUS_STYLES = {
+  CONFORME:  'bg-green-100 text-green-700',
+  OBSERVADO: 'bg-amber-100 text-amber-700',
+  SOBRANTE:  'bg-purple-100 text-purple-700'
+};
+
+function renderMovTable() {
+  const tbody = document.getElementById('movBody');
+  if (!movFiltered.length) {
+    tbody.innerHTML = `<tr><td colspan="${MOV_COLS.length + 1}" class="px-lg py-xl text-center text-on-surface-variant">Sin resultados para los filtros aplicados</td></tr>`;
+    document.getElementById('movCount').textContent = '0 movimientos';
+    document.getElementById('movTotal').textContent = '';
+    return;
+  }
+  tbody.innerHTML = movFiltered.map((r, i) => {
+    const sel = movSelected.has(i);
+    const cells = MOV_COLS.map(c => {
+      if (c.k === 'RBLOT') {
+        if (!r._rblot) return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-red-100 text-red-700" title="No se encontró en el saldo (código + lote físico)">SIN SALDO</span></td>`;
+        if (r._src === 'amb') return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 font-mono-data" title="Hay más de un LOTE BPCS posible; se tomó el de mayor saldo">${movEsc(r._rblot)}</span></td>`;
+        return `<td class="px-md py-sm font-mono-data text-[12px] font-bold text-secondary">${movEsc(r._rblot)}</td>`;
+      }
+      const v = r[c.k] || '';
+      if (c.k === 'ESTATUS') {
+        const cls = MOV_ESTATUS_STYLES[v.toUpperCase()] || 'bg-gray-100 text-gray-600';
+        return `<td class="px-md py-sm"><span class="inline-block px-sm py-xs rounded-full text-[11px] font-bold ${cls}">${movEsc(v) || '—'}</span></td>`;
+      }
+      if (c.k === 'RQTYT') return `<td class="px-md py-sm text-right font-mono-data font-bold text-on-surface text-[13px]">${Number(v || 0).toLocaleString('es-PE')}</td>`;
+      if (c.k === 'REFERENCIA' || c.k === 'RBPRD') return `<td class="px-md py-sm text-primary font-mono-data text-[12px] font-bold whitespace-nowrap">${movEsc(v)}</td>`;
+      return `<td class="px-md py-sm text-on-surface-variant font-mono-data text-[12px] whitespace-nowrap">${movEsc(v)}</td>`;
+    }).join('');
+    return `<tr class="hover:bg-blue-50/40 transition-colors ${sel ? 'bg-blue-50' : ''}">
+      <td class="px-md py-sm"><input type="checkbox" class="mov-row-cb rounded border-outline-variant text-primary cursor-pointer" ${sel ? 'checked' : ''} onchange="toggleMovRow(${i}, this)"/></td>
+      ${cells}</tr>`;
+  }).join('');
+
+  const total = movFiltered.reduce((s, r) => s + (parseFloat(r.RQTYT) || 0), 0);
+  const sinLote = movFiltered.filter(r => !r._rblot).length;
+  document.getElementById('movCount').textContent = movFiltered.length.toLocaleString('es-PE') + ' movimientos' + (sinLote ? ` · ${sinLote} sin LOTE BPCS` : '');
+  document.getElementById('movTotal').textContent = 'Total RQTYT: ' + total.toLocaleString('es-PE') + ' uds.';
+}
+
+function toggleMovRow(idx, cb) {
+  if (cb.checked) movSelected.add(idx); else movSelected.delete(idx);
+  const ca = document.getElementById('movCheckAll');
+  ca.indeterminate = movSelected.size > 0 && movSelected.size < movFiltered.length;
+  ca.checked = movSelected.size === movFiltered.length && movFiltered.length > 0;
+  updateMovBulkBar();
+}
+function toggleAllMov(master) {
+  movSelected.clear();
+  if (master.checked) movFiltered.forEach((_, i) => movSelected.add(i));
+  document.querySelectorAll('.mov-row-cb').forEach(cb => cb.checked = master.checked);
+  updateMovBulkBar();
+}
+function clearMovSelection() {
+  movSelected.clear();
+  document.querySelectorAll('.mov-row-cb').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('movCheckAll');
+  if (ca) { ca.checked = false; ca.indeterminate = false; }
+  updateMovBulkBar();
+}
+function updateMovBulkBar() {
+  const bar = document.getElementById('movBulkBar');
+  if (movSelected.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('movBulkCount').textContent = movSelected.size + ' fila' + (movSelected.size > 1 ? 's' : '') + ' seleccionada' + (movSelected.size > 1 ? 's' : '');
+  } else bar.classList.add('hidden');
+}
+
+function movFechaStr() {
+  const h = new Date();
+  return `${String(h.getDate()).padStart(2,'0')}${String(h.getMonth()+1).padStart(2,'0')}${h.getFullYear()}`;
+}
+
+// Exporta la vista (con RBLOT ya completado) a XLSX
+function exportMovimientos() {
+  const rows = movSelected.size ? [...movSelected].map(i => movFiltered[i]) : movFiltered;
+  if (!rows.length) { alert('No hay datos para exportar.'); return; }
+  const out = rows.map(r => {
+    const o = {};
+    MOV_COLS.forEach(c => { o[c.h] = c.k === 'RBLOT' ? r._rblot : r[c.k]; });
+    return o;
+  });
+  downloadXLSX(`Movimientos_${movFechaStr()}.xlsx`, out, 'Movimientos');
+}
+
+// Genera la plantilla TRFMAN en .xls (BIFF8): RCCUS, RBPRD, RBLOT, RQTYT, RFRWH, RTOWH, RFRLC, RTOLC, RNDOC, RCOM, RTHCMT, RRSNC.
+// Usa las filas seleccionadas; si no hay selección, todas las filtradas.
+function exportTRFMAN() {
+  const rows = movSelected.size ? [...movSelected].map(i => movFiltered[i]) : movFiltered;
+  if (!rows.length) { alert('No hay movimientos para generar la plantilla TRFMAN.'); return; }
+  const faltan = rows.filter(r => !r._rblot).length;
+  if (faltan && !confirm(`${faltan} de ${rows.length} fila(s) no tienen LOTE BPCS en el saldo (RBLOT quedará vacío).\n\n¿Generar la plantilla TRFMAN de todas formas?`)) return;
+
+  // Plantilla TRFMAN oficial (12 columnas, en este orden)
+  const TPL = ['RCCUS','RBPRD','RBLOT','RQTYT','RFRWH','RTOWH','RFRLC','RTOLC','RNDOC','RCOM','RTHCMT','RRSNC'];
+  const txt = v => { v = String(v == null ? '' : v).trim(); return v === '' ? undefined : v; }; // vacío => sin celda
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? undefined : n; };
+  const val = (r, c) => {
+    switch (c) {
+      case 'RCCUS':  return num(r.RCCUS);                       // general (número)
+      case 'RQTYT':  return num(r.RQTYT);                       // general (número)
+      case 'RBLOT':  return txt(r._rblot);                      // LOTE BPCS del saldo
+      case 'RNDOC':  return undefined;                          // siempre sin celda
+      case 'RTHCMT': return txt(r.NOM_USUARIO);                 // usuario
+      case 'RRSNC':  return (r.RFRWH || '').trim() === (r.RTOWH || '').trim() ? '02' : '01'; // RFRWH = RTOWH -> 02, si no 01
+      default:       return txt(r[c]);                          // RBPRD, RFRWH, RTOWH, RFRLC, RTOLC, RCOM: texto
+    }
+  };
+  const aoa = [TPL, ...rows.map(r => TPL.map(c => val(r, c)))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa); // celdas undefined no se escriben
+  ws['!cols'] = TPL.map(c => ({ wch: Math.max(c.length + 2, 14) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'TRFMAN');
+  XLSX.writeFile(wb, `TRFMAN_${movFechaStr()}.xls`, { bookType: 'biff8' });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.ghost-border').forEach(card => {
     card.addEventListener('mouseenter', () => { card.style.transform = 'translateY(-2px)'; });
     card.addEventListener('mouseleave', () => { card.style.transform = 'translateY(0)'; });
   });
   loadAllData();
-  loadHorizonte();
   loadRegistroDocumentario();
 });
 </script>
